@@ -81,7 +81,7 @@ export default function Live2DAvatar({
         if (!(window as any).Live2DCubismCore) {
           await new Promise<void>((resolve, reject) => {
             const s = document.createElement('script');
-            s.src = '/alisha/live2d/live2dcubismcore.min.js';
+            s.src = '/live2d/live2dcubismcore.min.js';
             s.onload = () => resolve();
             s.onerror = () => reject(new Error('Failed to load Cubism Core runtime.'));
             document.head.appendChild(s);
@@ -133,7 +133,7 @@ export default function Live2DAvatar({
         pixiAppRef.current = app;
 
         // 4) Load the Live2D model (Kei — official Live2D Cubism 4 sample)
-        const modelUrl = '/alisha/live2d/alisha/kei_basic_free.model3.json';
+        const modelUrl = '/live2d/alisha/kei_basic_free.model3.json';
         const model = await Live2DModel.from(modelUrl);
         if (cancelled) {
           try {
