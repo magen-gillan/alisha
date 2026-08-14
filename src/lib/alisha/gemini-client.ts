@@ -21,7 +21,7 @@ import { detectLanguage, systemInstructionFor } from './language';
 const API_BASE = '/api/gemini';
 
 export function getApiKey(): string {
-  // 1. User-set key (overrides baked key)
+  // 1. User-set key (overrides the encrypted Vercel server key)
   if (typeof window !== 'undefined') {
     const userKey = localStorage.getItem('alisha-gemini-api-key') || '';
     if (userKey.trim()) return userKey.trim();
@@ -42,13 +42,14 @@ export function hasApiKey(): boolean {
   return getApiKey().length > 0;
 }
 
-/** Kept for UI compatibility; server keys are never exposed to the browser. */
+/**
+ * UI-only indicator: an empty local key means requests use the encrypted
+ * GEMINI_API_KEY configured on Vercel. The server value is never returned.
+ */
 export function isUsingBakedKey(): boolean {
-  if (typeof window !== 'undefined') {
-    const userKey = localStorage.getItem('alisha-gemini-api-key') || '';
-    if (userKey.trim()) return false;
-  }
-  return false;
+  if (typeof window === 'undefined') return true;
+  const userKey = localStorage.getItem('alisha-gemini-api-key') || '';
+  return !userKey.trim();
 }
 
 /**

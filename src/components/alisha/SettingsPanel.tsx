@@ -63,6 +63,7 @@ import {
   Volume2,
   Trash2,
   CheckCircle2,
+  Save,
 } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -122,6 +123,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
   // ---- API key UI ----
   const [showApiKey, setShowApiKey] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState(apiKey);
+  const [saved, setSaved] = useState(false);
 
   // ---- TTS voices ----
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -184,6 +186,16 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
   // The effective key status for display
   const usingBaked = isUsingBakedKey() && !apiKey;
   const hasKey = Boolean(apiKey) || usingBaked;
+  const keySourceLabel = apiKey ? 'مفتاح محلي مخصص' : usingBaked ? 'مفتاح Vercel الخادمي السري' : 'لا يوجد مفتاح متاح';
+
+  const handleSave = () => {
+    // Zustand persist writes changes immediately; this explicit action gives
+    // the user a clear confirmation and flushes the current API key value.
+    persistApiKey(apiKeyInput.trim());
+    setApiKey(apiKeyInput.trim());
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2200);
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -193,8 +205,8 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
       >
         <SheetHeader className="border-b border-white/10 bg-gradient-to-br from-fuchsia-500/20 via-violet-500/10 to-transparent px-5 pb-4 pt-6">
           <SheetTitle className="text-2xl font-bold tracking-tight text-white">إعدادات اليشيا</SheetTitle>
-          <SheetDescription>
-            خصّص المشهد والصوت والذاكرة — تُحفظ التغييرات تلقائياً.
+              <SheetDescription>
+            خصّص المشهد والصوت والذاكرة، ثم اضغط حفظ التغييرات لتأكيدها.
           </SheetDescription>
         </SheetHeader>
 
@@ -213,6 +225,11 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                 </span>
               </AccordionTrigger>
               <AccordionContent className="space-y-3 pt-2">
+                <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                      <span className="text-xs text-white/70">مصدر المفتاح المستخدم فعلياً</span>
+                  <Badge variant={hasKey ? 'secondary' : 'destructive'} className="text-[10px]">{keySourceLabel}</Badge>
+                </div>
+
                 {/* API key status badge */}
                 <div className="flex items-center gap-2 flex-wrap">
                   {hasKey ? (
@@ -625,8 +642,15 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
             </AccordionItem>
           </Accordion>
 
+          <div className="sticky bottom-0 z-10 mt-6 space-y-2 border-t border-white/10 bg-[#241b35]/95 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
+            <Button onClick={handleSave} className="w-full bg-gradient-to-r from-fuchsia-500 to-violet-600 text-white shadow-lg shadow-fuchsia-900/30 hover:from-fuchsia-400 hover:to-violet-500">
+              {saved ? <CheckCircle2 className="mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
+              {saved ? 'تم حفظ التغييرات' : 'حفظ التغييرات'}
+            </Button>
+          </div>
+
           {/* Reset all */}
-          <div className="mt-6 pt-4 border-t">
+          <div className="mt-3 pt-2">
             <Button
               variant="outline"
               size="sm"

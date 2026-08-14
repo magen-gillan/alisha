@@ -222,21 +222,39 @@ export default function Live2DAvatar({
 
         // 7) Animation loop — drive mouth / motion based on state
         let phase = 0;
-        const tick = () => {
+        let blinkUntil = 0;
+        let nextBlink = performance.now() + 2400;
+        const tick = (now = performance.now()) => {
           phase += 0.1;
           if (modelRef.current) {
             try {
-              if (modelRef.current.internalModel?.setParameterValueById) {
-                const motionState = speakingRef.current
-                  ? (Math.sin(phase * 6) * 0.5 + 0.5) * 0.9 + 0.1
-                  : 0;
-                modelRef.current.internalModel.setParameterValueById(
-                  'ParamMouthOpenY',
-                  motionState
-                );
+              const internal = modelRef.current.internalModel;
+              const core = internal?.coreModel;
+              const setParameter = (id: string, value: number) => {
+                if (typeof internal?.setParameterValueById === 'function') {
+                  internal.setParameterValueById(id, value);
+                } else if (typeof core?.setParameterValueById === 'function') {
+                  core.setParameterValueById(id, value);
+                }
+              };
+
+              // Drive the actual Cubism core parameter, not only the PIXI wrapper.
+              // The sinusoid keeps the mouth moving for the duration of TTS.
+              const mouth = speakingRef.current
+                ? 0.12 + (Math.sin(phase * 7) * 0.5 + 0.5) * 0.78
+                : 0;
+              setParameter('ParamMouthOpenY', mouth);
+
+              // Natural periodic blinking, suspended briefly while speaking.
+              if (!speakingRef.current && now >= nextBlink) {
+                blinkUntil = now + 135;
+                nextBlink = now + 2200 + Math.random() * 2400;
               }
+              const eye = now < blinkUntil ? 0.05 : 1;
+              setParameter('ParamEyeLOpen', eye);
+              setParameter('ParamEyeROpen', eye);
             } catch {
-              /* noop */
+              /* noop: keep rendering even if a model build lacks a parameter */
             }
           }
           raf = requestAnimationFrame(tick);
