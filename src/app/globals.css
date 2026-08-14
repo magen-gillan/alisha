@@ -45,24 +45,24 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --background: oklch(0.13 0.035 292);
+  --foreground: oklch(0.97 0.015 300);
+  --card: oklch(0.19 0.045 292);
+  --card-foreground: oklch(0.97 0.015 300);
+  --popover: oklch(0.17 0.04 292);
+  --popover-foreground: oklch(0.97 0.015 300);
+  --primary: oklch(0.72 0.19 320);
+  --primary-foreground: oklch(0.16 0.04 292);
+  --secondary: oklch(0.25 0.06 292);
+  --secondary-foreground: oklch(0.96 0.02 300);
+  --muted: oklch(0.24 0.05 292);
+  --muted-foreground: oklch(0.78 0.04 300);
+  --accent: oklch(0.28 0.08 310);
+  --accent-foreground: oklch(0.98 0.01 300);
+  --destructive: oklch(0.68 0.2 25);
+  --border: oklch(1 0 0 / 14%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.72 0.19 320);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -195,6 +195,16 @@
   animation: petal-fall linear infinite;
 }
 
+/* Premium glass settings sheet and controls */
+.settings-accordion [data-slot="accordion-item"] { border-color: rgba(255,255,255,.10); }
+.settings-accordion [data-slot="accordion-content"] { color: rgba(255,255,255,.82); }
+.settings-accordion [data-slot="select-trigger"],
+.settings-accordion input,
+.settings-accordion textarea { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.16); color: rgba(255,255,255,.96); }
+.settings-accordion [data-slot="select-trigger"]:hover,
+.settings-accordion input:focus,
+.settings-accordion textarea:focus { background: rgba(255,255,255,.12); border-color: rgba(244,114,182,.65); }
+
 /* Hide scrollbars inside Settings sheet for cleaner look (still scrollable) */
 .alisha-scroll::-webkit-scrollbar { width: 6px; }
 .alisha-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
@@ -206,7 +216,7 @@
 }
 button, [role="button"] { -webkit-tap-highlight-color: transparent; }
 @media (max-width: 640px) {
-  [data-slot="sheet-content"] { max-height: calc(100dvh - 1rem); border-radius: 1.25rem 1.25rem 0 0; }
+  [data-slot="sheet-content"] { max-height: calc(100dvh - 1rem); border-radius: 1.25rem 1.25rem 0 0; width: min(100vw, 30rem); }
   [data-slot="sheet-header"] { padding-top: max(1rem, env(safe-area-inset-top)); }
   .alisha-scroll { padding-bottom: max(1.25rem, var(--safe-bottom)); }
 }

@@ -58,10 +58,10 @@ export const LANGUAGE_NATIVE_LABELS: Record<ResponseLanguage, string> = {
 };
 
 export const BACKGROUND_LABELS: Record<BackgroundId, string> = {
-  aurora: 'Aurora',
-  sunset: 'Sunset',
-  midnight: 'Midnight',
-  sakura: 'Sakura',
+  aurora: 'الشفق البنفسجي',
+  sunset: 'حديقة الساكورا',
+  midnight: 'سطح ضوء القمر',
+  sakura: 'غرفة السحاب',
 };
 
 /** Voice language options for TTS. */

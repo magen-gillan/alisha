@@ -70,12 +70,24 @@ interface SettingsPanelProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const BACKGROUNDS: { id: BackgroundId; gradient: string }[] = [
-  { id: 'aurora', gradient: 'from-emerald-500 to-teal-700' },
-  { id: 'sunset', gradient: 'from-orange-400 to-purple-700' },
-  { id: 'midnight', gradient: 'from-indigo-900 to-black' },
-  { id: 'sakura', gradient: 'from-pink-200 to-rose-400' },
+const BACKGROUNDS: { id: BackgroundId; image: string; accent: string }[] = [
+  { id: 'aurora', image: '/backgrounds/aurora.png', accent: 'بحيرة الشفق' },
+  { id: 'sunset', image: '/backgrounds/sakura.png', accent: 'حديقة الساكورا' },
+  { id: 'midnight', image: '/backgrounds/moonlit.png', accent: 'سطح ضوء القمر' },
+  { id: 'sakura', image: '/backgrounds/cloudroom.png', accent: 'غرفة السحاب' },
 ];
+
+const responseLanguageForVoice = (locale: string): ResponseLanguage => {
+  if (locale.toLowerCase().startsWith('ja')) return 'ja';
+  if (locale.toLowerCase().startsWith('en')) return 'en';
+  return 'ar';
+};
+
+const voiceLocaleForResponse = (language: ResponseLanguage): string => {
+  if (language === 'ja') return 'ja-JP';
+  if (language === 'en') return 'en-US';
+  return 'ar-SA';
+};
 
 export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
   const {
@@ -177,12 +189,12 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-md overflow-y-auto flex flex-col gap-4 p-0"
+        className="w-full sm:max-w-md overflow-y-auto flex flex-col gap-4 border-l border-white/20 bg-[#241b35]/95 p-0 text-white shadow-2xl backdrop-blur-2xl"
       >
-        <SheetHeader className="px-5 pt-5 pb-3 border-b">
-          <SheetTitle className="text-2xl">الإعدادات</SheetTitle>
+        <SheetHeader className="border-b border-white/10 bg-gradient-to-br from-fuchsia-500/20 via-violet-500/10 to-transparent px-5 pb-4 pt-6">
+          <SheetTitle className="text-2xl font-bold tracking-tight text-white">إعدادات اليشيا</SheetTitle>
           <SheetDescription>
-            اضبط الإعدادات في أقسام منفصلة. كل تغيير يُحفظ تلقائياً.
+            خصّص المشهد والصوت والذاكرة — تُحفظ التغييرات تلقائياً.
           </SheetDescription>
         </SheetHeader>
 
@@ -190,7 +202,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
           <Accordion
             type="multiple"
             defaultValue={['keys', 'language']}
-            className="w-full"
+            className="w-full settings-accordion"
           >
             {/* ============ Section 1: API Keys & Models ============ */}
             <AccordionItem value="keys">
@@ -359,17 +371,18 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                       key={bg.id}
                       type="button"
                       onClick={() => setBackground(bg.id)}
-                      className={`relative h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                      className={`group relative h-24 overflow-hidden rounded-xl border-2 transition-all ${
                         background === bg.id
                           ? 'border-primary ring-2 ring-primary/30'
                           : 'border-transparent hover:border-muted-foreground/30'
                       }`}
                     >
                       <div
-                        className={`absolute inset-0 bg-gradient-to-br ${bg.gradient}`}
+                        className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105"
+                        style={{ backgroundImage: `url(${bg.image})` }}
                       />
-                      <span className="absolute bottom-1 left-2 text-xs font-medium text-white drop-shadow">
-                        {BACKGROUND_LABELS[bg.id]}
+                      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2 pb-2 pt-5 text-xs font-semibold text-white">
+                        {BACKGROUND_LABELS[bg.id]} · {bg.accent}
                       </span>
                       {background === bg.id && (
                         <span className="absolute top-1 right-2 text-xs">✓</span>
@@ -397,7 +410,12 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                   </p>
                   <Select
                     value={responseLanguage}
-                    onValueChange={(v) => setResponseLanguage(v as ResponseLanguage)}
+                    onValueChange={(v) => {
+                      const next = v as ResponseLanguage;
+                      setResponseLanguage(next);
+                      setVoiceLanguage(voiceLocaleForResponse(next));
+                      setVoiceURI('');
+                    }}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue />
@@ -419,13 +437,14 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                     لغة الصوت (TTS)
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    لغة الصوت المستخدم لقراءة الردود. قد تختلف عن لغة الرد.
+                    لغة الصوت هي لغة الرد أيضاً؛ عند تغييرها تتغير لغة Gemini تلقائياً.
                   </p>
                   <Select
                     value={voiceLanguage}
                     onValueChange={(v) => {
                       setVoiceLanguage(v);
-                      setVoiceURI(''); // reset chosen voice when language changes
+                      setResponseLanguage(responseLanguageForVoice(v));
+                      setVoiceURI('');
                     }}
                   >
                     <SelectTrigger className="w-full">
