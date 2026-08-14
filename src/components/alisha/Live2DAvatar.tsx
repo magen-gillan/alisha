@@ -221,11 +221,12 @@ export default function Live2DAvatar({
         window.addEventListener('orientationchange', onResize);
 
         // 7) Animation loop — drive mouth / motion based on state
-        let phase = 0;
         let blinkUntil = 0;
         let nextBlink = performance.now() + 2400;
+        let mouthValue = 0;
+        let mouthTarget = 0;
+        let nextMouthChange = 0;
         const tick = (now = performance.now()) => {
-          phase += 0.1;
           if (modelRef.current) {
             try {
               const internal = modelRef.current.internalModel;
@@ -238,12 +239,20 @@ export default function Live2DAvatar({
                 }
               };
 
-              // Drive the actual Cubism core parameter, not only the PIXI wrapper.
-              // The sinusoid keeps the mouth moving for the duration of TTS.
-              const mouth = speakingRef.current
-                ? 0.12 + (Math.sin(phase * 7) * 0.5 + 0.5) * 0.78
-                : 0;
-              setParameter('ParamMouthOpenY', mouth);
+              // Approximate natural syllable timing instead of a fast sinusoid.
+              // Targets change every 90–220ms and ease toward the next target,
+              // which looks closer to speech and avoids a mechanical vibration.
+              if (speakingRef.current) {
+                if (now >= nextMouthChange) {
+                  mouthTarget = Math.random() < 0.22 ? 0.04 : 0.14 + Math.random() * 0.68;
+                  nextMouthChange = now + 90 + Math.random() * 130;
+                }
+              } else {
+                mouthTarget = 0;
+                nextMouthChange = now + 260;
+              }
+              mouthValue += (mouthTarget - mouthValue) * (speakingRef.current ? 0.16 : 0.24);
+              setParameter('ParamMouthOpenY', Math.max(0, Math.min(1, mouthValue)));
 
               // Natural periodic blinking, suspended briefly while speaking.
               if (!speakingRef.current && now >= nextBlink) {
