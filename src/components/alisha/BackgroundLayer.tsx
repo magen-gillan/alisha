@@ -18,7 +18,7 @@ export default function BackgroundLayer({ background }: BackgroundLayerProps) {
   return (
     <div
       aria-hidden="true"
-      className="absolute inset-0 -z-10 overflow-hidden bg-[#211a31]"
+      className="absolute inset-0 z-0 overflow-hidden bg-[#211a31]"
     >
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-[background-image] duration-700"
