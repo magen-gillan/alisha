@@ -84,7 +84,7 @@ export default function Home() {
       <header className="relative z-20 flex items-center justify-between px-4 sm:px-6 py-3 shrink-0">
         <div className="flex items-center gap-2">
           <img
-            src="/alisha-icon.png"
+            src="/alisha-new-icon.png"
             alt="أيقونة اليشيا"
             className="h-10 w-10 rounded-full border border-white/40 object-cover shadow-lg shadow-fuchsia-900/30"
           />

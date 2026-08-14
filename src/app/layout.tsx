@@ -20,9 +20,9 @@ export const metadata: Metadata = {
   keywords: ["Alisha", "Live2D", "Gemini", "AI Avatar", "Voice Chat", "Next.js"],
   authors: [{ name: "Alisha Project" }],
   icons: {
-    icon: '/alisha-icon.png',
-    shortcut: '/alisha-icon.png',
-    apple: '/alisha-icon.png',
+    icon: '/alisha-new-icon.png',
+    shortcut: '/alisha-new-icon.png',
+    apple: '/alisha-new-icon.png',
   },
   openGraph: {
     title: "Alisha — Live2D Avatar with Gemini AI",

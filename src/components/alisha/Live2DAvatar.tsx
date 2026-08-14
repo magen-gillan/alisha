@@ -384,7 +384,7 @@ function FallbackAvatar({
         style={{ animationDuration: thinking ? '3s' : undefined }}
       >
         <img
-          src="/alisha-avatar.png"
+          src="/alisha-new-avatar.webp"
           alt="أفاتار اليشيا"
           className="h-full w-full object-cover object-top"
         />

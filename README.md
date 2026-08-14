@@ -1,7 +1,7 @@
 # اليشيا — Alisha
 
 <p align="center">
-  <img src="public/alisha-icon.png" alt="أيقونة اليشيا" width="160" height="160" />
+  <img src="public/alisha-new-icon.png" alt="أيقونة اليشيا" width="160" height="160" />
 </p>
 
 <p align="center"><strong>أفاتار تفاعلي يعمل مع Gemini AI وLive2D</strong></p>
@@ -62,3 +62,11 @@ pnpm dlx vercel@latest deploy --prod
 ## التقنية
 
 Next.js، React، TypeScript، Tailwind CSS، Zustand، PixiJS، pixi-live2d-display، Web Speech API، وGemini API.
+
+## الشخصية الجديدة
+
+أضيفت شخصية اليشيا الجديدة المولدة من الصفر إلى `public/alisha-new-avatar.webp`، وتُستخدم كأيقونة وصورة احتياطية عند تعذر تحميل Live2D. يبقى نموذج Live2D الحالي هو المسار المتحرك الأساسي؛ تحويل الشخصية الجديدة إلى نموذج Live2D كامل يتطلب فصل طبقات الوجه والشعر والعينين والفم ثم rigging وتصدير ملفات Cubism.
+
+## التشخيص والإيقاف
+
+تحتوي لوحة الإعدادات على زر لاختبار اتصال Gemini وعدد النماذج المتاحة، بينما يمكن إيقاف الرد النصي أثناء التفكير. ويضمن `pnpm run test:smoke` فحص الأصول الأساسية ومسار Gemini بعد النشر.
