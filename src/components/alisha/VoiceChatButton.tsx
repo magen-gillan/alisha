@@ -140,6 +140,7 @@ export default function VoiceChatButton({
         detectedLanguage: detected,
         responseLanguage,
         model,
+        // chatWithGemini appends the current voice turn itself.
         history: historyRef.current,
         permanentMemory,
         signal: controller.signal,
@@ -193,7 +194,7 @@ export default function VoiceChatButton({
     <Button
       type="button"
       onClick={handleClick}
-      disabled={state === 'thinking'}
+      disabled={false}
       size="lg"
       className={`relative rounded-full w-20 h-20 sm:w-24 sm:h-24 shadow-xl transition-all duration-300 ${
         state === 'listening'

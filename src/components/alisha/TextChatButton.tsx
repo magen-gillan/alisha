@@ -40,6 +40,7 @@ export default function TextChatButton({
     permanentMemory,
     conversation,
     addMessage,
+    removeLastUserMessage,
   } = useAlishaStore();
 
   // Keep a ref to conversation history for sending to Gemini
@@ -81,6 +82,7 @@ export default function TextChatButton({
         detectedLanguage: detected,
         responseLanguage,
         model,
+        // chatWithGemini appends the current user turn itself.
         history: historyRef.current,
         permanentMemory,
         signal: controller.signal,
@@ -119,6 +121,7 @@ export default function TextChatButton({
     } catch (err: any) {
       if (err?.name === 'AbortError' || requestId !== requestIdRef.current) return;
       setInput(text);
+      removeLastUserMessage(text);
       console.error('[TextChat] Gemini error:', err);
       toast.error(err?.message || 'Failed to get a response from Gemini.');
       setThinking(false);

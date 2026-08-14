@@ -152,7 +152,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
   const testConnection = async () => {
     setTestingConnection(true);
     try {
-      const list = await listGeminiModels();
+      const list = await listGeminiModels(apiKeyInput.trim() || undefined);
       setModels(list);
       toast.success(`الاتصال يعمل — ${list.length} نماذج متاحة`);
     } catch (err: any) {
@@ -166,7 +166,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     setLoadingModels(true);
     setModelsError('');
     try {
-      const list = await listGeminiModels();
+      const list = await listGeminiModels(apiKeyInput.trim() || undefined);
       setModels(list);
       // If the user's currently selected model isn't in the available list
       // (e.g. they had a deprecated model from an older session), auto-switch

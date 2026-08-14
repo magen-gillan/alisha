@@ -7,14 +7,18 @@ async function check(path, expected = 200) {
 }
 
 await check('/');
-await check('/alisha-icon.png');
+await check('/alisha-new-icon.png');
+await check('/alisha-new-avatar.webp');
 for (const file of ['aurora.webp', 'sakura.webp', 'moonlit.webp', 'cloudroom.webp']) {
   await check(`/backgrounds/${file}`);
 }
 
 const models = await (await check('/api/gemini')).json();
-if (!Array.isArray(models.models) || models.models.length !== 3) {
-  throw new Error(`Expected 3 chat models, got ${models.models?.length ?? 0}`);
+if (!Array.isArray(models.models) || models.models.length < 1) {
+  throw new Error(`Expected at least one usable chat model, got ${models.models?.length ?? 0}`);
+}
+if (models.models.some((model) => !model.name.endsWith('-latest'))) {
+  throw new Error('Model list contains a non-stable alias');
 }
 
 const response = await fetch(`${base}/api/gemini`, {

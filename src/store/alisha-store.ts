@@ -35,6 +35,7 @@ interface AlishaStore extends AlishaSettings {
   setVoiceLanguage: (lang: string) => void;
   setVoiceURI: (uri: string) => void;
   addMessage: (msg: Omit<ChatMessage, 'id' | 'ts'>) => void;
+  removeLastUserMessage: (text: string) => void;
   clearConversation: () => void;
   reset: () => void;
 }
@@ -99,6 +100,17 @@ export const useAlishaStore = create<AlishaStore>()(
             { ...msg, id: genId(), ts: Date.now() },
           ].slice(-100), // keep last 100 messages
         })),
+      removeLastUserMessage: (text) =>
+        set((state) => {
+          const reversedIndex = [...state.conversation].reverse().findIndex(
+            (message) => message.role === 'user' && message.text === text,
+          );
+          if (reversedIndex < 0) return state;
+          const actualIndex = state.conversation.length - 1 - reversedIndex;
+          return {
+            conversation: state.conversation.filter((_, index) => index !== actualIndex),
+          };
+        }),
       clearConversation: () => set({ conversation: [] }),
       reset: () =>
         set({
