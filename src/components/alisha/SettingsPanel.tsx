@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
   Sheet,
   SheetContent,
@@ -120,6 +121,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
   // ---- Models ----
   const [models, setModels] = useState<GeminiModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
   const [modelsError, setModelsError] = useState<string>('');
 
   // ---- API key UI ----
@@ -146,6 +148,19 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
       setVoices(getVoicesForLanguage(voiceLanguage));
     });
   }, [voiceLanguage, open]);
+
+  const testConnection = async () => {
+    setTestingConnection(true);
+    try {
+      const list = await listGeminiModels();
+      setModels(list);
+      toast.success(`الاتصال يعمل — ${list.length} نماذج متاحة`);
+    } catch (err: any) {
+      toast.error(err?.message || 'تعذر الاتصال بخادم Gemini');
+    } finally {
+      setTestingConnection(false);
+    }
+  };
 
   const fetchModels = async () => {
     setLoadingModels(true);
@@ -285,22 +300,30 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
 
                 {/* Model selection */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <Label className="text-sm font-medium">موديل Gemini</Label>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={fetchModels}
-                      disabled={loadingModels}
-                      className="h-7 px-2"
-                    >
-                      {loadingModels ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <RefreshCw className="w-3 h-3" />
-                      )}
-                      <span className="ml-1 text-xs">تحديث</span>
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={fetchModels}
+                        disabled={loadingModels}
+                        className="h-7 px-2"
+                      >
+                        {loadingModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                        <span className="ml-1 text-xs">تحديث</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void testConnection()}
+                        disabled={testingConnection}
+                        className="h-7 px-2 border-emerald-300/30"
+                      >
+                        {testingConnection ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                        <span className="ml-1 text-xs">اختبار</span>
+                      </Button>
+                    </div>
                   </div>
                   {modelsError ? (
                     <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-xs">

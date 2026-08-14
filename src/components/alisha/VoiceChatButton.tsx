@@ -154,7 +154,7 @@ export default function VoiceChatButton({
       // Speak the response
       setState('speaking');
       onThinkingChange(false);
-      onSpeakingChange(true);
+      onSpeakingChange(false);
 
       speak({
         text: chat.text,
@@ -163,6 +163,7 @@ export default function VoiceChatButton({
         voiceURI,
         rate: speechRate,
         pitch: speechPitch,
+        onStart: () => onSpeakingChange(true),
         onEnd: () => {
           setState('idle');
           onSpeakingChange(false);

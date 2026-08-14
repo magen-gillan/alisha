@@ -9,6 +9,7 @@ import { useAlishaStore } from '@/store/alisha-store';
 import {
   isTTSSupported,
   speak,
+  stopSpeaking,
   loadVoices,
 } from '@/lib/alisha/speech';
 import { detectLanguage } from '@/lib/alisha/language';
@@ -92,7 +93,7 @@ export default function TextChatButton({
 
       setThinking(false);
       onThinkingChange(false);
-      onSpeakingChange(true);
+      onSpeakingChange(false);
 
       if (!isTTSSupported()) {
         toast.error('Text-to-speech is not supported in this browser.');
@@ -107,6 +108,7 @@ export default function TextChatButton({
         voiceURI,
         rate: speechRate,
         pitch: speechPitch,
+        onStart: () => onSpeakingChange(true),
         onEnd: () => onSpeakingChange(false),
         onError: (e) => {
           console.error('TTS error:', e);
@@ -125,6 +127,17 @@ export default function TextChatButton({
     } finally {
       if (requestId === requestIdRef.current) abortRef.current = null;
     }
+  };
+
+  const handleCancel = () => {
+    requestIdRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    stopSpeaking();
+    setThinking(false);
+    onThinkingChange(false);
+    onSpeakingChange(false);
+    toast('تم إيقاف الرد');
   };
 
   const handleClose = () => {
@@ -185,14 +198,14 @@ export default function TextChatButton({
               />
               <Button
                 type="button"
-                onClick={handleSubmit}
-                disabled={!input.trim() || thinking}
+                onClick={thinking ? handleCancel : handleSubmit}
+                disabled={thinking ? false : !input.trim()}
                 size="icon"
                 className="rounded-full w-11 h-11 bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 shrink-0"
-                aria-label="Send"
+                aria-label={thinking ? 'Cancel response' : 'Send'}
               >
                 {thinking ? (
-                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+                  <X className="w-5 h-5 text-white" />
                 ) : (
                   <Send className="w-5 h-5 text-white" />
                 )}
