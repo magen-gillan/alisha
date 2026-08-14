@@ -47,5 +47,21 @@ export async function GET(request: NextRequest) {
   const apiKey = clientKey || process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) return NextResponse.json({ error: { message: 'لم تتم إضافة GEMINI_API_KEY في إعدادات Vercel بعد.' } }, { status: 503 });
   const response = await fetch(`${API_BASE}/models?key=${encodeURIComponent(apiKey)}&pageSize=200`, { cache: 'no-store' });
-  return NextResponse.json(await response.json(), { status: response.status });
+  const payload = await response.json();
+  if (!response.ok) return NextResponse.json(payload, { status: response.status });
+
+  // The upstream API lists every capability enabled for the key. The app is a
+  // text-chat avatar, so expose only stable production chat aliases. This is
+  // deliberately enforced server-side as well as in the client.
+  const models = (payload.models ?? []).filter((item: any) => {
+    const name = String(item.name ?? '').replace(/^models\//, '');
+    const methods = Array.isArray(item.supportedGenerationMethods)
+      ? item.supportedGenerationMethods
+      : [];
+    return name.startsWith('gemini-')
+      && name.endsWith('-latest')
+      && methods.includes('generateContent')
+      && !/(image|preview|exp|experimental|vision|tts|audio|live|translate|robotics|computer)/i.test(name);
+  });
+  return NextResponse.json({ ...payload, models }, { status: response.status });
 }

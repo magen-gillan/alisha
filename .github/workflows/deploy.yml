@@ -1,4 +1,4 @@
-name: Validate Next.js app
+name: Validate and redirect GitHub Pages
 
 on:
   push:
@@ -8,6 +8,12 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   validate:
@@ -27,3 +33,35 @@ jobs:
         run: bun run lint
       - name: Build
         run: bun run build
+
+  redirect-pages:
+    if: github.event_name == 'push'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: https://magen-gillan.github.io/alisha/
+    steps:
+      - name: Create redirect page
+        run: |
+          mkdir -p _site
+          cat > _site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="ar" dir="rtl">
+            <head>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="0;url=https://alisha-puce.vercel.app/">
+              <link rel="canonical" href="https://alisha-puce.vercel.app/">
+              <title>اليشيا — جاري فتح النسخة الجديدة</title>
+            </head>
+            <body>
+              <p>جاري فتح النسخة الجديدة من اليشيا… <a href="https://alisha-puce.vercel.app/">اضغط هنا للمتابعة</a></p>
+            </body>
+          </html>
+          HTML
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy GitHub Pages artifact
+        uses: actions/deploy-pages@v4
