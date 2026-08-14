@@ -32,7 +32,15 @@ export async function POST(request: NextRequest) {
     if ((response.status === 429 || response.status === 503) && model !== 'gemini-flash-lite-latest') {
       response = await makeRequest('gemini-flash-lite-latest');
     }
-    const data = await response.json();
+    let data = await response.json();
+    const hasText = data?.candidates?.some((candidate: any) =>
+      candidate?.content?.parts?.some((part: any) => typeof part?.text === 'string' && part.text.trim()),
+    );
+    if (response.ok && !hasText && model !== 'gemini-flash-lite-latest') {
+      const retry = await makeRequest('gemini-flash-lite-latest');
+      data = await retry.json();
+      response = retry;
+    }
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {

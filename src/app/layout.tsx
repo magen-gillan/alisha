@@ -13,9 +13,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// basePath is required for GitHub Pages project sites
-const BASE = "/alisha";
-
 export const metadata: Metadata = {
   title: "Alisha — Live2D Avatar with Gemini AI",
   description:
@@ -23,7 +20,9 @@ export const metadata: Metadata = {
   keywords: ["Alisha", "Live2D", "Gemini", "AI Avatar", "Voice Chat", "Next.js"],
   authors: [{ name: "Alisha Project" }],
   icons: {
-    icon: `${BASE}/logo.svg`,
+    icon: '/alisha-icon.png',
+    shortcut: '/alisha-icon.png',
+    apple: '/alisha-icon.png',
   },
   openGraph: {
     title: "Alisha — Live2D Avatar with Gemini AI",

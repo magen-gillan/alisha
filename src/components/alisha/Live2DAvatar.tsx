@@ -356,49 +356,16 @@ function FallbackAvatar({
         }`}
         style={{ animationDuration: thinking ? '3s' : undefined }}
       >
-        {/* Simple anime-style face */}
-        <svg viewBox="0 0 200 200" className="w-full h-full">
-          {/* Hair back */}
-          <ellipse cx="100" cy="100" rx="80" ry="85" fill="#3a2a4a" />
-          {/* Face */}
-          <ellipse cx="100" cy="110" rx="58" ry="65" fill="#ffe4d4" />
-          {/* Hair front */}
-          <path
-            d="M 40 70 Q 60 30 100 30 Q 140 30 160 70 L 155 95 Q 130 75 100 75 Q 70 75 45 95 Z"
-            fill="#4a3a5a"
-          />
-          {/* Eyes */}
-          <g
-            className={speaking ? 'origin-center' : ''}
-            transform={speaking ? 'scale(1, 0.9)' : ''}
-            style={{ transformOrigin: '100px 110px' }}
-          >
-            <ellipse cx="78" cy="110" rx="9" ry="11" fill="#7c3aed" />
-            <ellipse cx="122" cy="110" rx="9" ry="11" fill="#7c3aed" />
-            <ellipse cx="78" cy="108" rx="3" ry="4" fill="#fff" />
-            <ellipse cx="122" cy="108" rx="3" ry="4" fill="#fff" />
-          </g>
-          {/* Blush */}
-          <ellipse cx="70" cy="135" rx="8" ry="5" fill="#fda4af" opacity="0.6" />
-          <ellipse cx="130" cy="135" rx="8" ry="5" fill="#fda4af" opacity="0.6" />
-          {/* Mouth — animates while speaking */}
-          {speaking ? (
-            <ellipse cx="100" cy="148" rx="6" ry="5" fill="#9d174d" />
-          ) : (
-            <path
-              d="M 92 148 Q 100 154 108 148"
-              stroke="#9d174d"
-              strokeWidth="2"
-              fill="none"
-              strokeLinecap="round"
-            />
-          )}
-        </svg>
+        <img
+          src="/alisha-avatar.png"
+          alt="أفاتار اليشيا"
+          className="h-full w-full object-cover object-top"
+        />
       </div>
       <p className="text-xs text-muted-foreground max-w-xs">
         {error
-          ? `Live2D unavailable — using fallback avatar. (${error})`
-          : 'Loading Live2D model…'}
+          ? `Live2D unavailable — using Alisha image avatar. (${error})`
+          : 'Loading Alisha avatar…'}
       </p>
     </div>
   );

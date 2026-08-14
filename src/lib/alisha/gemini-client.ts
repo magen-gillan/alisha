@@ -189,7 +189,8 @@ export async function chatWithGemini(req: ChatRequest, apiKey?: string): Promise
     generationConfig: {
       temperature: 0.8,
       topP: 0.95,
-      maxOutputTokens: 512,
+      // Leave enough output budget so the model cannot consume it before text appears.
+      maxOutputTokens: 1024,
     },
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },

@@ -8,7 +8,7 @@ import TextChatButton from '@/components/alisha/TextChatButton';
 import SettingsPanel from '@/components/alisha/SettingsPanel';
 import StatusBar from '@/components/alisha/StatusBar';
 import { Button } from '@/components/ui/button';
-import { Settings, Volume2, VolumeX } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { useAlishaStore } from '@/store/alisha-store';
 import { stopSpeaking } from '@/lib/alisha/speech';
 
@@ -58,7 +58,6 @@ export default function Home() {
   const [speaking, setSpeaking] = useState(false);
   const [listening, setListening] = useState(false);
   const [thinking, setThinking] = useState(false);
-  const [muted, setMuted] = useState(false);
   const { background, responseLanguage } = useAlishaStore();
   const viewportHeight = useVisualViewportHeight();
 
@@ -66,11 +65,6 @@ export default function Home() {
   useEffect(() => {
     return () => stopSpeaking();
   }, []);
-
-  // If muted, kill ongoing speech
-  useEffect(() => {
-    if (muted) stopSpeaking();
-  }, [muted]);
 
   // Set document direction based on response language for Arabic
   useEffect(() => {
@@ -89,9 +83,11 @@ export default function Home() {
       {/* Top bar — fixed height */}
       <header className="relative z-20 flex items-center justify-between px-4 sm:px-6 py-3 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-pink-400 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-lg">
-            A
-          </div>
+          <img
+            src="/alisha-icon.png"
+            alt="أيقونة اليشيا"
+            className="h-10 w-10 rounded-full border border-white/40 object-cover shadow-lg shadow-fuchsia-900/30"
+          />
           <div className="flex flex-col">
             <span className="text-base sm:text-lg font-semibold text-white drop-shadow">
               اليشيا
@@ -103,19 +99,6 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setMuted((m) => !m)}
-            className="text-white hover:bg-white/10"
-            aria-label={muted ? 'Unmute' : 'Mute'}
-          >
-            {muted ? (
-              <VolumeX className="w-5 h-5" />
-            ) : (
-              <Volume2 className="w-5 h-5" />
-            )}
-          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -133,7 +116,7 @@ export default function Home() {
         <div className="relative w-full h-full max-w-[min(88vw,28rem)] max-h-[min(62vh,34rem)] mx-auto flex items-center justify-center">
           <Live2DAvatar
             background={background}
-            speaking={speaking && !muted}
+            speaking={speaking}
             listening={listening}
             thinking={thinking}
           />
@@ -146,7 +129,7 @@ export default function Home() {
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         <StatusBar
-          speaking={speaking && !muted}
+          speaking={speaking}
           listening={listening}
           thinking={thinking}
           responseLanguage={responseLanguage}
@@ -155,24 +138,14 @@ export default function Home() {
         <div className="flex items-end gap-4 sm:gap-6">
           <VoiceChatButton
             onSpeakingChange={(s) => {
-              if (muted && s) {
-                stopSpeaking();
-                setSpeaking(false);
-              } else {
-                setSpeaking(s);
-              }
+              setSpeaking(s)
             }}
             onListeningChange={setListening}
             onThinkingChange={setThinking}
           />
           <TextChatButton
             onSpeakingChange={(s) => {
-              if (muted && s) {
-                stopSpeaking();
-                setSpeaking(false);
-              } else {
-                setSpeaking(s);
-              }
+              setSpeaking(s)
             }}
             onThinkingChange={setThinking}
           />
