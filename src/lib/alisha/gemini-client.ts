@@ -83,27 +83,6 @@ const DEPRECATED_MODELS = new Set<string>([
   'gemini-pro-vision',
 ]);
 
-/**
- * Models that are KNOWN to work for all users (including new ones) as of 2026.
- * These are the "-latest" aliases that always point to the current production
- * model. We always include them in the picker, even if ListModels doesn't
- * return them (the API sometimes omits aliases).
- */
-const ALWAYS_AVAILABLE_MODELS: GeminiModel[] = [
-  {
-    name: 'gemini-flash-latest',
-    displayName: 'Gemini Flash (Latest)',
-    description: 'Fast, efficient model. Best for chat — auto-updates to the latest Flash version.',
-    supportedMethods: ['generateContent'],
-  },
-  {
-    name: 'gemini-pro-latest',
-    displayName: 'Gemini Pro (Latest)',
-    description: 'Most capable model. Higher quality but slower — auto-updates to the latest Pro version.',
-    supportedMethods: ['generateContent'],
-  },
-];
-
 /** GET /v1beta/models — list models the given key can actually use. */
 export async function listGeminiModels(apiKey?: string): Promise<GeminiModel[]> {
   const key = apiKey || getApiKey();
@@ -134,27 +113,20 @@ export async function listGeminiModels(apiKey?: string): Promise<GeminiModel[]> 
       return false;
     }
     if (DEPRECATED_MODELS.has(m.name)) return false;
-    // Exclude preview/exp/lite variants — too unstable for a chat avatar
-    if (/-(preview|exp|experimental|vision)$/i.test(m.name)) return false;
+    // The picker is for text chat only: exclude image, preview, and experimental models.
+    if (/(image|preview|exp|experimental|vision)/i.test(m.name)) return false;
+    // Keep only production aliases returned for this exact API key. This avoids
+    // showing models that are listed globally but are not stable for this app.
+    if (!m.name.endsWith('-latest')) return false;
     return true;
   });
-
-  // Always make sure the "-latest" aliases are present (the API sometimes
-  // omits them from ListModels responses, even though they're valid).
-  const presentNames = new Set(usable.map((m) => m.name));
-  for (const m of ALWAYS_AVAILABLE_MODELS) {
-    if (!presentNames.has(m.name)) {
-      usable.push(m);
-    }
-  }
 
   // Sort: prefer "latest" aliases first (these are the only reliable models
   // for new users), then by name alphabetically.
   const preferredOrder = (n: string): number => {
     if (n === 'gemini-flash-latest') return 0;
     if (n === 'gemini-pro-latest') return 1;
-    if (n.endsWith('-latest')) return 2;
-    return 99;
+    return 2;
   };
   usable.sort((a, b) => {
     const pa = preferredOrder(a.name);

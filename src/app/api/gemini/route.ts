@@ -12,17 +12,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: { message: 'لم تتم إضافة GEMINI_API_KEY في إعدادات Vercel بعد.' } }, { status: 503 });
     }
 
-    const { apiKey: _ignored, ...geminiBody } = body ?? {};
-    const model = typeof geminiBody.model === 'string' && geminiBody.model.trim()
-      ? geminiBody.model.trim()
+    const { apiKey: _ignored, model: requestedModel, ...geminiBody } = body ?? {};
+    const model = typeof requestedModel === 'string' && requestedModel.trim()
+      ? requestedModel.trim()
       : 'gemini-flash-latest';
-    const response = await fetch(`${API_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(geminiBody),
-      cache: 'no-store',
-      signal: request.signal,
-    });
+    const makeRequest = (modelName: string) => fetch(
+      `${API_BASE}/models/${encodeURIComponent(modelName)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geminiBody),
+        cache: 'no-store',
+        signal: request.signal,
+      },
+    );
+    let response = await makeRequest(model);
+    // Gemini may temporarily reject a busy model. Retry once with the stable
+    // Flash Lite alias returned by the same account, without hiding other errors.
+    if ((response.status === 429 || response.status === 503) && model !== 'gemini-flash-lite-latest') {
+      response = await makeRequest('gemini-flash-lite-latest');
+    }
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
