@@ -7,10 +7,10 @@ interface BackgroundLayerProps {
 }
 
 const BACKGROUND_IMAGES: Record<BackgroundId, string> = {
-  aurora: '/backgrounds/aurora.png',
-  sunset: '/backgrounds/sakura.png',
-  midnight: '/backgrounds/moonlit.png',
-  sakura: '/backgrounds/cloudroom.png',
+  aurora: '/backgrounds/aurora.webp',
+  sunset: '/backgrounds/sakura.webp',
+  midnight: '/backgrounds/moonlit.webp',
+  sakura: '/backgrounds/cloudroom.webp',
 };
 
 /** Image-based scene backgrounds with a subtle readability veil. */

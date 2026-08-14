@@ -43,8 +43,9 @@ export default function StatusBar({
     : 'Responding in English';
 
   return (
-    <div className="flex flex-col items-center gap-1 text-center">
+    <div className="flex flex-col items-center gap-1 text-center" role="status" aria-live="polite" aria-atomic="true">
       <p className={`text-sm sm:text-base font-medium transition-colors ${color}`}>
+        <span className="sr-only">حالة اليشيا: </span>
         {label}
       </p>
       <p className="text-xs text-muted-foreground/70">

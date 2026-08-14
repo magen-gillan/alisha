@@ -46,6 +46,8 @@ import {
 import {
   loadVoices,
   getVoicesForLanguage,
+  speak,
+  stopSpeaking,
 } from '@/lib/alisha/speech';
 import {
   Loader2,
@@ -72,10 +74,10 @@ interface SettingsPanelProps {
 }
 
 const BACKGROUNDS: { id: BackgroundId; image: string; accent: string }[] = [
-  { id: 'aurora', image: '/backgrounds/aurora.png', accent: 'بحيرة الشفق' },
-  { id: 'sunset', image: '/backgrounds/sakura.png', accent: 'حديقة الساكورا' },
-  { id: 'midnight', image: '/backgrounds/moonlit.png', accent: 'سطح ضوء القمر' },
-  { id: 'sakura', image: '/backgrounds/cloudroom.png', accent: 'غرفة السحاب' },
+  { id: 'aurora', image: '/backgrounds/aurora.webp', accent: 'بحيرة الشفق' },
+  { id: 'sunset', image: '/backgrounds/sakura.webp', accent: 'حديقة الساكورا' },
+  { id: 'midnight', image: '/backgrounds/moonlit.webp', accent: 'سطح ضوء القمر' },
+  { id: 'sakura', image: '/backgrounds/cloudroom.webp', accent: 'غرفة السحاب' },
 ];
 
 const responseLanguageForVoice = (locale: string): ResponseLanguage => {
@@ -127,6 +129,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
 
   // ---- TTS voices ----
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [previewingVoice, setPreviewingVoice] = useState(false);
 
   // Sync local input when the store value changes externally
   useEffect(() => {
@@ -506,6 +509,33 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                     </Select>
                   )}
                 </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-fuchsia-300/30 bg-white/5"
+                  onClick={() => {
+                    if (previewingVoice) {
+                      stopSpeaking();
+                      setPreviewingVoice(false);
+                      return;
+                    }
+                    setPreviewingVoice(true);
+                    speak({
+                      text: responseLanguage === 'ja' ? 'こんにちは、私はアリーシャです。' : responseLanguage === 'en' ? 'Hello, I am Alisha.' : 'مرحباً، أنا اليشيا.',
+                      language: responseLanguage,
+                      voiceLanguage,
+                      voiceURI,
+                      rate: speechRate,
+                      pitch: speechPitch,
+                      onEnd: () => setPreviewingVoice(false),
+                      onError: () => setPreviewingVoice(false),
+                    });
+                  }}
+                >
+                  <Volume2 className="mr-2 h-4 w-4" />
+                  {previewingVoice ? 'إيقاف العينة' : 'تشغيل عينة الصوت'}
+                </Button>
 
                 {/* Speech rate */}
                 <div className="space-y-2">

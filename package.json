@@ -8,6 +8,7 @@
     "build:static": "next build && echo 'Static site ready in ./out'",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
+    "test:smoke": "node scripts/smoke-check.mjs",
     "db:push": "prisma db push --accept-data-loss",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
