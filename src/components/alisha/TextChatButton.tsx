@@ -14,6 +14,7 @@ import {
 } from '@/lib/alisha/speech';
 import { detectLanguage } from '@/lib/alisha/language';
 import { chatWithGemini } from '@/lib/alisha/gemini-client';
+import { chatWithPollinations } from '@/lib/alisha/pollinations-client';
 
 interface TextChatButtonProps {
   onSpeakingChange: (speaking: boolean) => void;
@@ -33,6 +34,10 @@ export default function TextChatButton({
   const {
     responseLanguage,
     model,
+    pollinationsModel,
+    provider,
+    apiKey,
+    pollinationsApiKey,
     speechRate,
     speechPitch,
     voiceLanguage,
@@ -75,18 +80,20 @@ export default function TextChatButton({
 
     try {
       const detected = detectLanguage(text);
-      console.log(`[TextChat] input="${text}" detected=${detected} → ${responseLanguage}`);
+      console.log(`[TextChat] input="${text}" detected=${detected} → ${responseLanguage} via ${provider}`);
 
-      const chat = await chatWithGemini({
+      const chatReq = {
         userInput: text,
         detectedLanguage: detected,
         responseLanguage,
-        model,
-        // chatWithGemini appends the current user turn itself.
+        model: provider === 'pollinations' ? pollinationsModel : model,
         history: historyRef.current,
         permanentMemory,
         signal: controller.signal,
-      });
+      };
+      const chat = provider === 'pollinations'
+        ? await chatWithPollinations(chatReq, pollinationsApiKey || undefined)
+        : await chatWithGemini(chatReq, apiKey || undefined);
 
       if (requestId !== requestIdRef.current) return;
 

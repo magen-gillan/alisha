@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AlishaSettings, ResponseLanguage, BackgroundId } from '@/lib/alisha/types';
+import type { AlishaSettings, ResponseLanguage, BackgroundId, AIProvider } from '@/lib/alisha/types';
 import { DEPRECATED_MODELS } from '@/lib/alisha/gemini-client';
 
 export interface ChatMessage {
@@ -16,6 +16,8 @@ export interface ChatMessage {
 interface AlishaStore extends AlishaSettings {
   /** User-set Gemini API key (overrides the build-time baked-in key). */
   apiKey: string;
+  /** User-set Pollinations API key (optional; anonymous tier is the fallback). */
+  pollinationsApiKey: string;
   /** Permanent memory — instructions injected into every Gemini request. */
   permanentMemory: string;
   /** Voice language for TTS (BCP-47, e.g. ar-SA, ja-JP, en-US). */
@@ -28,9 +30,12 @@ interface AlishaStore extends AlishaSettings {
   setResponseLanguage: (lang: ResponseLanguage) => void;
   setBackground: (bg: BackgroundId) => void;
   setModel: (model: string) => void;
+  setPollinationsModel: (model: string) => void;
+  setProvider: (provider: AIProvider) => void;
   setSpeechRate: (rate: number) => void;
   setSpeechPitch: (pitch: number) => void;
   setApiKey: (key: string) => void;
+  setPollinationsApiKey: (key: string) => void;
   setPermanentMemory: (text: string) => void;
   setVoiceLanguage: (lang: string) => void;
   setVoiceURI: (uri: string) => void;
@@ -56,6 +61,7 @@ const DEFAULT_PERMANENT_MEMORY = `# ذاكرة دائمة — تعليمات ل�
 
 const DEFAULTS: AlishaSettings & {
   apiKey: string;
+  pollinationsApiKey: string;
   permanentMemory: string;
   voiceLanguage: string;
   voiceURI: string;
@@ -67,9 +73,14 @@ const DEFAULTS: AlishaSettings & {
   // (gemini-2.0-flash, gemini-1.5-flash, gemini-2.5-flash are all deprecated
   //  for new users as of 2026).
   model: 'gemini-flash-latest',
+  // Pollinations: openai-fast is always available (anonymous tier).
+  pollinationsModel: 'openai-fast',
+  // Default provider is Gemini (preserves existing user behaviour).
+  provider: 'gemini',
   speechRate: 1.0,
   speechPitch: 1.0,
   apiKey: '',
+  pollinationsApiKey: '',
   permanentMemory: DEFAULT_PERMANENT_MEMORY,
   voiceLanguage: 'ar-SA',
   voiceURI: '',
@@ -87,9 +98,12 @@ export const useAlishaStore = create<AlishaStore>()(
       setResponseLanguage: (lang) => set({ responseLanguage: lang }),
       setBackground: (bg) => set({ background: bg }),
       setModel: (model) => set({ model }),
+      setPollinationsModel: (model) => set({ pollinationsModel: model }),
+      setProvider: (provider) => set({ provider }),
       setSpeechRate: (rate) => set({ speechRate: rate }),
       setSpeechPitch: (pitch) => set({ speechPitch: pitch }),
       setApiKey: (key) => set({ apiKey: key }),
+      setPollinationsApiKey: (key) => set({ pollinationsApiKey: key }),
       setPermanentMemory: (text) => set({ permanentMemory: text }),
       setVoiceLanguage: (lang) => set({ voiceLanguage: lang }),
       setVoiceURI: (uri) => set({ voiceURI: uri }),
@@ -120,15 +134,18 @@ export const useAlishaStore = create<AlishaStore>()(
     }),
     {
       name: 'alisha-settings',
-      version: 5,
+      version: 6,
       // Don't persist conversation across reloads (it's "current session")
       partialize: (state) => ({
         responseLanguage: state.responseLanguage,
         background: state.background,
         model: state.model,
+        pollinationsModel: state.pollinationsModel,
+        provider: state.provider,
         speechRate: state.speechRate,
         speechPitch: state.speechPitch,
         apiKey: state.apiKey,
+        pollinationsApiKey: state.pollinationsApiKey,
         permanentMemory: state.permanentMemory,
         voiceLanguage: state.voiceLanguage,
         voiceURI: state.voiceURI,
@@ -142,6 +159,18 @@ export const useAlishaStore = create<AlishaStore>()(
           if (DEPRECATED_MODELS.has(persisted.model)) {
             persisted.model = 'gemini-flash-latest';
           }
+        }
+        // v5 → v6: add Pollinations provider settings with sensible defaults
+        // if missing, but NEVER override what the user explicitly set.
+        if (!persisted) return persisted;
+        if (typeof persisted.provider !== 'string') {
+          persisted.provider = 'gemini';
+        }
+        if (typeof persisted.pollinationsModel !== 'string' || !persisted.pollinationsModel) {
+          persisted.pollinationsModel = 'openai-fast';
+        }
+        if (typeof persisted.pollinationsApiKey !== 'string') {
+          persisted.pollinationsApiKey = '';
         }
         return persisted;
       },

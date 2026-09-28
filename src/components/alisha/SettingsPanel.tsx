@@ -33,17 +33,25 @@ import type {
   GeminiModel,
   ResponseLanguage,
   BackgroundId,
+  AIProvider,
 } from '@/lib/alisha/types';
 import {
   LANGUAGE_LABELS,
   BACKGROUND_LABELS,
   VOICE_LANGUAGES,
+  PROVIDER_LABELS,
+  PROVIDER_DESCRIPTIONS,
 } from '@/lib/alisha/types';
 import {
   listGeminiModels,
   setApiKey as persistApiKey,
   isUsingBakedKey,
 } from '@/lib/alisha/gemini-client';
+import {
+  listPollinationsModels,
+  setPollinationsApiKey as persistPollinationsApiKey,
+  isUsingBakedPollinationsKey,
+} from '@/lib/alisha/pollinations-client';
 import {
   loadVoices,
   getVoicesForLanguage,
@@ -101,6 +109,9 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     speechRate,
     speechPitch,
     apiKey,
+    pollinationsApiKey,
+    pollinationsModel,
+    provider,
     permanentMemory,
     voiceLanguage,
     voiceURI,
@@ -108,9 +119,12 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     setResponseLanguage,
     setBackground,
     setModel,
+    setPollinationsModel,
+    setProvider,
     setSpeechRate,
     setSpeechPitch,
     setApiKey,
+    setPollinationsApiKey,
     setPermanentMemory,
     setVoiceLanguage,
     setVoiceURI,
@@ -119,14 +133,21 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
   } = useAlishaStore();
 
   // ---- Models ----
+  // Two separate lists: one per provider. The UI shows the list for whichever
+  // provider is currently active.
   const [models, setModels] = useState<GeminiModel[]>([]);
+  const [pollinationsModels, setPollinationsModelsList] = useState<GeminiModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [loadingPollinationsModels, setLoadingPollinationsModels] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [modelsError, setModelsError] = useState<string>('');
+  const [pollinationsModelsError, setPollinationsModelsError] = useState<string>('');
 
   // ---- API key UI ----
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showPollinationsKey, setShowPollinationsKey] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState(apiKey);
+  const [pollinationsKeyInput, setPollinationsKeyInput] = useState(pollinationsApiKey);
   const [saved, setSaved] = useState(false);
 
   // ---- TTS voices ----
@@ -137,10 +158,17 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
   useEffect(() => {
     if (apiKeyInput !== apiKey) {
       // This effect synchronizes an external persisted store into the input field.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setApiKeyInput(apiKey);
     }
   }, [apiKey]);
+
+  useEffect(() => {
+    if (pollinationsKeyInput !== pollinationsApiKey) {
+       
+      setPollinationsKeyInput(pollinationsApiKey);
+    }
+  }, [pollinationsApiKey]);
 
   // Load voices on mount and when voiceLanguage changes
   useEffect(() => {
@@ -152,11 +180,17 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
   const testConnection = async () => {
     setTestingConnection(true);
     try {
-      const list = await listGeminiModels(apiKeyInput.trim() || undefined);
-      setModels(list);
-      toast.success(`الاتصال يعمل — ${list.length} نماذج متاحة`);
+      if (provider === 'pollinations') {
+        const list = await listPollinationsModels(pollinationsKeyInput.trim() || undefined);
+        setPollinationsModelsList(list);
+        toast.success(`Pollinations يعمل — ${list.length} نماذج متاحة`);
+      } else {
+        const list = await listGeminiModels(apiKeyInput.trim() || undefined);
+        setModels(list);
+        toast.success(`Gemini يعمل — ${list.length} نماذج متاحة`);
+      }
     } catch (err: any) {
-      toast.error(err?.message || 'تعذر الاتصال بخادم Gemini');
+      toast.error(err?.message || 'تعذر الاتصال بالمزود');
     } finally {
       setTestingConnection(false);
     }
@@ -168,10 +202,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     try {
       const list = await listGeminiModels(apiKeyInput.trim() || undefined);
       setModels(list);
-      // If the user's currently selected model isn't in the available list
-      // (e.g. they had a deprecated model from an older session), auto-switch
-      // to the first available model (which is always gemini-flash-latest
-      // because we sort it first).
       const stillAvailable = list.some((m) => m.name === model);
       if (!stillAvailable && list.length > 0) {
         setModel(list[0].name);
@@ -184,33 +214,76 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     }
   };
 
+  const fetchPollinationsModels = async () => {
+    setLoadingPollinationsModels(true);
+    setPollinationsModelsError('');
+    try {
+      const list = await listPollinationsModels(pollinationsKeyInput.trim() || undefined);
+      setPollinationsModelsList(list);
+      const stillAvailable = list.some((m) => m.name === pollinationsModel);
+      if (!stillAvailable && list.length > 0) {
+        setPollinationsModel(list[0].name);
+      }
+    } catch (err: any) {
+      setPollinationsModelsError(err?.message || 'Unknown error');
+      setPollinationsModelsList([]);
+    } finally {
+      setLoadingPollinationsModels(false);
+    }
+  };
+
   useEffect(() => {
-    if (open && models.length === 0 && !loadingModels && !modelsError) {
+    if (open && provider === 'gemini' && models.length === 0 && !loadingModels && !modelsError) {
       // Fetching here intentionally updates loading/error state from an external API.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       void fetchModels();
     }
-  }, [open, models.length, loadingModels, modelsError]);
+    if (open && provider === 'pollinations' && pollinationsModels.length === 0 && !loadingPollinationsModels && !pollinationsModelsError) {
+       
+      void fetchPollinationsModels();
+    }
+  }, [open, provider, models.length, loadingModels, modelsError, pollinationsModels.length, loadingPollinationsModels, pollinationsModelsError]);
 
   const handleApiKeyChange = (value: string) => {
     setApiKeyInput(value);
     setApiKey(value);
     persistApiKey(value);
-    // Clear cached models when key changes
     setModels([]);
     setModelsError('');
   };
 
-  // The effective key status for display
+  const handlePollinationsKeyChange = (value: string) => {
+    setPollinationsKeyInput(value);
+    setPollinationsApiKey(value);
+    persistPollinationsApiKey(value);
+    setPollinationsModelsList([]);
+    setPollinationsModelsError('');
+  };
+
+  // The effective key status for display — depends on the active provider
   const usingBaked = isUsingBakedKey() && !apiKey;
   const hasKey = Boolean(apiKey) || usingBaked;
-  const keySourceLabel = apiKey ? 'مفتاح محلي مخصص' : usingBaked ? 'مفتاح Vercel الخادمي السري' : 'لا يوجد مفتاح متاح';
+  const keySourceLabel = apiKey
+    ? 'مفتاح Gemini محلي مخصص'
+    : usingBaked
+      ? 'مفتاح Gemini الخادمي السري'
+      : 'لا يوجد مفتاح Gemini';
+
+  const pollinationsUsingBaked = isUsingBakedPollinationsKey() && !pollinationsApiKey;
+  const pollinationsHasSource = Boolean(pollinationsApiKey) || pollinationsUsingBaked;
+  const pollinationsKeySourceLabel = pollinationsApiKey
+    ? 'مفتاح Pollinations محلي مخصص'
+    : pollinationsUsingBaked
+      ? 'الطبقة المجهولة (Anonymous)'
+      : 'الطبقة المجهولة (Anonymous)';
 
   const handleSave = () => {
     // Zustand persist writes changes immediately; this explicit action gives
-    // the user a clear confirmation and flushes the current API key value.
+    // the user a clear confirmation and flushes all current API key values.
     persistApiKey(apiKeyInput.trim());
     setApiKey(apiKeyInput.trim());
+    persistPollinationsApiKey(pollinationsKeyInput.trim());
+    setPollinationsApiKey(pollinationsKeyInput.trim());
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2200);
   };
@@ -222,18 +295,74 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
         className="w-full sm:max-w-md overflow-y-auto flex flex-col gap-4 border-l border-white/20 bg-[#241b35]/95 p-0 text-white shadow-2xl backdrop-blur-2xl"
       >
         <SheetHeader className="border-b border-white/10 bg-gradient-to-br from-fuchsia-500/20 via-violet-500/10 to-transparent px-5 pb-4 pt-6">
-          <SheetTitle className="text-2xl font-bold tracking-tight text-white">إعدادات اليشيا</SheetTitle>
+          <SheetTitle className="text-2xl font-bold tracking-tight text-white">Alisha Settings</SheetTitle>
               <SheetDescription>
-            خصّص المشهد والصوت والذاكرة، ثم اضغط حفظ التغييرات لتأكيدها.
+            خصّص المزود والمشهد والصوت والذاكرة، ثم اضغط حفظ التغييرات لتأكيدها.
           </SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="flex-1 px-5 pb-5">
           <Accordion
             type="multiple"
-            defaultValue={['keys', 'language']}
+            defaultValue={['provider', 'keys', 'language']}
             className="w-full settings-accordion"
           >
+            {/* ============ Section 0: AI Provider ============ */}
+            <AccordionItem value="provider">
+              <AccordionTrigger className="text-base font-semibold">
+                <span className="flex items-center gap-2">
+                  <Brain className="w-4 h-4" />
+                  مزود الذكاء الاصطناعي
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3 pt-2">
+                <p className="text-xs text-muted-foreground">
+                  اختر المزود الذي سيولّد الردود النصية. الصوت يُولّد دائماً عبر متصفحك (Web Speech API) بغض النظر عن المزود المختار.
+                </p>
+
+                <div className="grid grid-cols-1 gap-2">
+                  {(Object.keys(PROVIDER_LABELS) as AIProvider[]).map((p) => {
+                    const isSelected = provider === p;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setProvider(p)}
+                        className={`text-right rounded-lg border-2 p-3 transition-all ${
+                          isSelected
+                            ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
+                            : 'border-white/10 bg-white/5 hover:border-muted-foreground/30'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold">
+                            {PROVIDER_LABELS[p]}
+                          </span>
+                          {isSelected && (
+                            <CheckCircle2 className="w-4 h-4 text-primary" />
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {PROVIDER_DESCRIPTIONS[p]}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Active provider summary */}
+                <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-white/70">المزود النشط حالياً</span>
+                    <Badge variant="secondary" className="text-[10px] gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      {PROVIDER_LABELS[provider]}
+                    </Badge>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
             {/* ============ Section 1: API Keys & Models ============ */}
             <AccordionItem value="keys">
               <AccordionTrigger className="text-base font-semibold">
@@ -363,6 +492,115 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                       ? `${models.length} موديل متاح لهذا المفتاح`
                       : 'جارٍ تحميل الموديلات…'}
                   </p>
+                </div>
+
+                {/* ============ Pollinations API key ============ */}
+                <div className="mt-5 pt-4 border-t border-white/10">
+                  <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                    <span className="text-xs text-white/70">مصدر مفتاح Pollinations</span>
+                    <Badge variant={pollinationsHasSource ? 'secondary' : 'destructive'} className="text-[10px]">
+                      {pollinationsKeySourceLabel}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">مفتاح Pollinations API (اختياري)</Label>
+                      <a
+                        href="https://pollinations.ai/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                      >
+                        Pollinations.ai <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      اختياري — Pollinations يعمل بدون مفتاح (طبقة مجهولة). إضافة مفتاح مسجّل يفتح نماذج إضافية ويستخدم حصة المستخدم الخاصة.
+                    </p>
+                    <div className="relative">
+                      <input
+                        type={showPollinationsKey ? 'text' : 'password'}
+                        value={pollinationsKeyInput}
+                        onChange={(e) => handlePollinationsKeyChange(e.target.value)}
+                        placeholder="sk_..."
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPollinationsKey((s) => !s)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showPollinationsKey ? 'إخفاء المفتاح' : 'إظهار المفتاح'}
+                      >
+                        {showPollinationsKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Pollinations model selection */}
+                  <div className="space-y-2 mt-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-sm font-medium">موديل Pollinations</Label>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={fetchPollinationsModels}
+                          disabled={loadingPollinationsModels}
+                          className="h-7 px-2"
+                        >
+                          {loadingPollinationsModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                          <span className="ml-1 text-xs">تحديث</span>
+                        </Button>
+                      </div>
+                    </div>
+                    {pollinationsModelsError ? (
+                      <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-xs">
+                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                        <div>{pollinationsModelsError}</div>
+                      </div>
+                    ) : null}
+                    <Select
+                      value={
+                        pollinationsModels.some((m) => m.name === pollinationsModel)
+                          ? pollinationsModel
+                          : (pollinationsModels[0]?.name || 'openai-fast')
+                      }
+                      onValueChange={setPollinationsModel}
+                      disabled={loadingPollinationsModels && pollinationsModels.length === 0}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="اختر موديلاً">
+                          {pollinationsModel || 'openai-fast'}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pollinationsModels.length === 0 && !loadingPollinationsModels ? (
+                          <SelectItem value={pollinationsModel || 'openai-fast'}>
+                            {pollinationsModel || 'openai-fast'}
+                          </SelectItem>
+                        ) : (
+                          pollinationsModels.map((m) => (
+                            <SelectItem key={m.name} value={m.name}>
+                              <div className="flex flex-col">
+                                <span>{m.displayName}</span>
+                                <span className="text-xs text-muted-foreground">{m.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground">
+                      {pollinationsModels.length > 0
+                        ? `${pollinationsModels.length} موديل متاح`
+                        : loadingPollinationsModels
+                          ? 'جارٍ تحميل موديلات Pollinations…'
+                          : 'اضغط "تحديث" لجلب الموديلات المتاحة'}
+                    </p>
+                  </div>
                 </div>
               </AccordionContent>
             </AccordionItem>

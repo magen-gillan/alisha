@@ -16,6 +16,7 @@ import {
 } from '@/lib/alisha/speech';
 import { detectLanguage } from '@/lib/alisha/language';
 import { chatWithGemini } from '@/lib/alisha/gemini-client';
+import { chatWithPollinations } from '@/lib/alisha/pollinations-client';
 
 interface VoiceChatButtonProps {
   onSpeakingChange: (speaking: boolean) => void;
@@ -34,6 +35,10 @@ export default function VoiceChatButton({
   const {
     responseLanguage,
     model,
+    pollinationsModel,
+    provider,
+    apiKey,
+    pollinationsApiKey,
     speechRate,
     speechPitch,
     voiceLanguage,
@@ -133,18 +138,21 @@ export default function VoiceChatButton({
     abortRef.current = controller;
     try {
       const detected = detectLanguage(userText);
-      console.log(`[VoiceChat] input="${userText}" detected=${detected} → ${responseLanguage}`);
+      console.log(`[VoiceChat] input="${userText}" detected=${detected} → ${responseLanguage} via ${provider}`);
 
-      const chat = await chatWithGemini({
+      const chatReq = {
         userInput: userText,
         detectedLanguage: detected,
         responseLanguage,
-        model,
-        // chatWithGemini appends the current voice turn itself.
+        // Pick the right model id for whichever provider is active
+        model: provider === 'pollinations' ? pollinationsModel : model,
         history: historyRef.current,
         permanentMemory,
         signal: controller.signal,
-      });
+      };
+      const chat = provider === 'pollinations'
+        ? await chatWithPollinations(chatReq, pollinationsApiKey || undefined)
+        : await chatWithGemini(chatReq, apiKey || undefined);
 
       if (requestId !== requestIdRef.current) return;
 
