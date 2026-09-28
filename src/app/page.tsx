@@ -85,15 +85,15 @@ export default function Home() {
         <div className="flex items-center gap-2">
           <img
             src="/alisha-new-icon.png"
-            alt="أيقونة اليشيا"
+            alt="Alisha"
             className="h-10 w-10 rounded-full border border-white/40 object-cover shadow-lg shadow-fuchsia-900/30"
           />
           <div className="flex flex-col">
             <span className="text-base sm:text-lg font-semibold text-white drop-shadow">
-              اليشيا
+              Alisha
             </span>
             <span className="text-[10px] text-white/70 drop-shadow">
-              Live2D · Gemini AI
+              Live2D · AI Avatar
             </span>
           </div>
         </div>
