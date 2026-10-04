@@ -225,9 +225,18 @@ export function speak(opts: TTSOptions): void {
   const voice = pickVoice(opts.language, opts.voiceLanguage, opts.voiceURI);
   if (voice) utter.voice = voice;
 
-  utter.onstart = () => opts.onStart?.();
-  utter.onend = () => opts.onEnd?.();
-  utter.onerror = (e) => opts.onError?.(e?.error || 'tts_error');
+  utter.onstart = () => {
+    if (generation !== speechGeneration) return;
+    opts.onStart?.();
+  };
+  utter.onend = () => {
+    if (generation !== speechGeneration) return;
+    opts.onEnd?.();
+  };
+  utter.onerror = (e) => {
+    if (generation !== speechGeneration) return;
+    opts.onError?.(e?.error || 'tts_error');
+  };
 
   // Small delay to ensure cancel completes (Chrome quirk)
   pendingSpeakTimer = setTimeout(() => {

@@ -81,7 +81,9 @@ export default function TextChatButton({
 
     try {
       const detected = detectLanguage(text);
-      console.log(`[TextChat] input="${text}" detected=${detected} → ${responseLanguage} via ${provider}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[TextChat] lang=${detected} → ${responseLanguage} via ${provider} (${text.length} chars)`);
+      }
 
       const chatReq = {
         userInput: text,
@@ -103,7 +105,7 @@ export default function TextChatButton({
 
       setThinking(false);
       onThinkingChange(false);
-      onSpeakingChange(false);
+      onSpeakingChange(true);
 
       if (!isTTSSupported()) {
         toast.error('Text-to-speech is not supported in this browser.');
@@ -193,7 +195,7 @@ export default function TextChatButton({
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="اكتب أي شيء… (أي لغة)"
+                placeholder=""
                 rows={2}
                 disabled={thinking}
                 className="flex-1 resize-none bg-transparent text-white placeholder:text-white/40 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base min-h-[60px]"
@@ -221,14 +223,6 @@ export default function TextChatButton({
                   <Send className="w-5 h-5 text-white" />
                 )}
               </Button>
-            </div>
-            <div className="flex items-center justify-between mt-1 px-1">
-              <span className="text-[10px] text-white/40">
-                Enter للإرسال · Shift+Enter لسطر جديد · Esc للإغلاق
-              </span>
-              <span className="text-[10px] text-white/40">
-                {input.length} حرف
-              </span>
             </div>
           </div>
         </div>
