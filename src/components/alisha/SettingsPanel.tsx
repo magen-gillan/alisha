@@ -299,14 +299,19 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     persistPollinationsApiKey(pollinationsKeyInput.trim());
     setPollinationsApiKey(pollinationsKeyInput.trim());
     setSaved(true);
-    window.setTimeout(() => setSaved(false), 2200);
+    // Close the settings panel after a brief confirmation flash so the user
+    // sees that the save succeeded before the sheet slides away.
+    window.setTimeout(() => {
+      setSaved(false);
+      onOpenChange(false);
+    }, 900);
   };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-md overflow-y-auto flex flex-col gap-4 border-l border-white/20 bg-[#241b35]/95 p-0 text-white shadow-2xl backdrop-blur-2xl"
+        className="w-full sm:max-w-md overflow-y-auto flex flex-col gap-4 border-l border-white/20 bg-[#241b35]/95 p-0 text-white shadow-2xl backdrop-blur-2xl [&>button[data-slot=sheet-close]]:hidden"
       >
         <SheetHeader className="border-b border-white/10 bg-gradient-to-br from-fuchsia-500/20 via-violet-500/10 to-transparent px-5 pb-4 pt-6 relative">
           <SheetTitle className="text-2xl font-bold tracking-tight text-white">Alisha Settings</SheetTitle>
@@ -314,10 +319,10 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="absolute top-3 right-3 z-30 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            className="absolute top-3 left-3 z-30 inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-black hover:bg-red-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 shadow-lg"
             aria-label="Close settings"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5 font-bold" strokeWidth={3} />
           </button>
         </SheetHeader>
 
