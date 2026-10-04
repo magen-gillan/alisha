@@ -38,6 +38,7 @@ export default function TextChatButton({
     provider,
     apiKey,
     pollinationsApiKey,
+    geminiKeyChoice,
     speechRate,
     speechPitch,
     voiceLanguage,
@@ -93,7 +94,7 @@ export default function TextChatButton({
       };
       const chat = provider === 'pollinations'
         ? await chatWithPollinations(chatReq, pollinationsApiKey || undefined)
-        : await chatWithGemini(chatReq, apiKey || undefined);
+        : await chatWithGemini(chatReq, apiKey || undefined, geminiKeyChoice);
 
       if (requestId !== requestIdRef.current) return;
 

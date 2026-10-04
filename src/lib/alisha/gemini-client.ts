@@ -15,6 +15,7 @@ import type {
   ChatResponse,
   GeminiModel,
   ResponseLanguage,
+  GeminiKeyChoice,
 } from './types';
 import { detectLanguage, systemInstructionFor } from './language';
 
@@ -85,10 +86,17 @@ const DEPRECATED_MODELS = new Set<string>([
 ]);
 
 /** GET /v1beta/models — list models the given key can actually use. */
-export async function listGeminiModels(apiKey?: string): Promise<GeminiModel[]> {
+export async function listGeminiModels(
+  apiKey?: string,
+  keyChoice?: GeminiKeyChoice,
+): Promise<GeminiModel[]> {
   const key = apiKey || getApiKey();
 
-  const resp = await fetch(API_BASE, key ? { headers: { 'x-client-key': key } } : undefined);
+  const headers: Record<string, string> = {};
+  if (key) headers['x-client-key'] = key;
+  if (keyChoice) headers['x-gemini-key-choice'] = keyChoice;
+
+  const resp = await fetch(API_BASE, Object.keys(headers).length ? { headers } : undefined);
   const data = await resp.json();
 
   if (!resp.ok) {
@@ -140,7 +148,11 @@ export async function listGeminiModels(apiKey?: string): Promise<GeminiModel[]> 
 }
 
 /** POST /v1beta/models/{model}:generateContent — generate a response, language-forced. */
-export async function chatWithGemini(req: ChatRequest, apiKey?: string): Promise<ChatResponse> {
+export async function chatWithGemini(
+  req: ChatRequest,
+  apiKey?: string,
+  keyChoice?: GeminiKeyChoice,
+): Promise<ChatResponse> {
   const key = apiKey || getApiKey();
   if (!req.userInput?.trim()) {
     throw new Error('userInput is required.');
@@ -201,9 +213,12 @@ export async function chatWithGemini(req: ChatRequest, apiKey?: string): Promise
     ],
   };
 
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (keyChoice) headers['x-gemini-key-choice'] = keyChoice;
+
   const resp = await fetch(API_BASE, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ ...body, model: modelId, ...(key ? { apiKey: key } : {}) }),
     signal: req.signal,
   });

@@ -39,6 +39,7 @@ export default function VoiceChatButton({
     provider,
     apiKey,
     pollinationsApiKey,
+    geminiKeyChoice,
     speechRate,
     speechPitch,
     voiceLanguage,
@@ -152,7 +153,7 @@ export default function VoiceChatButton({
       };
       const chat = provider === 'pollinations'
         ? await chatWithPollinations(chatReq, pollinationsApiKey || undefined)
-        : await chatWithGemini(chatReq, apiKey || undefined);
+        : await chatWithGemini(chatReq, apiKey || undefined, geminiKeyChoice);
 
       if (requestId !== requestIdRef.current) return;
 

@@ -15,6 +15,23 @@ export type BackgroundId = 'aurora' | 'sunset' | 'midnight' | 'sakura';
  */
 export type AIProvider = 'gemini' | 'pollinations';
 
+/**
+ * Which Gemini server-side key to use as the PRIMARY key.
+ * The other key is always kept as an automatic fallback.
+ *
+ * - `auto`     : Start with GEMINI_API_KEY (the new active key),
+ *                fall back to GEMINI_API_KEY_LEGACY on failure.
+ *                This is the safe default that keeps the new key first.
+ * - `primary`  : Same as `auto` — explicitly use the primary key first.
+ * - `legacy`   : Start with GEMINI_API_KEY_LEGACY (the old key),
+ *                fall back to GEMINI_API_KEY on failure.
+ *                Use this if you want to compare behaviour or if the
+ *                primary key is temporarily blocked.
+ *
+ * The user-supplied client key (if any) ALWAYS overrides the server-side keys.
+ */
+export type GeminiKeyChoice = 'auto' | 'primary' | 'legacy';
+
 export interface AlishaSettings {
   /** Language Alisha responds in (regardless of input language). */
   responseLanguage: ResponseLanguage;
@@ -26,6 +43,8 @@ export interface AlishaSettings {
   pollinationsModel: string;
   /** Active AI provider. */
   provider: AIProvider;
+  /** Which Gemini server key to prefer when no client key is set. */
+  geminiKeyChoice: GeminiKeyChoice;
   /** Speech rate for TTS (0.5 - 2.0). */
   speechRate: number;
   /** Speech pitch for TTS (0 - 2). */
@@ -94,6 +113,18 @@ export const PROVIDER_LABELS: Record<AIProvider, string> = {
 export const PROVIDER_DESCRIPTIONS: Record<AIProvider, string> = {
   gemini: 'Google Gemini AI — نماذج Flash و Pro',
   pollinations: 'Pollinations.ai — مزود مجاني بمفتاح اختياري، يدعم GPT وغيرها',
+};
+
+export const GEMINI_KEY_CHOICE_LABELS: Record<GeminiKeyChoice, string> = {
+  auto: 'تلقائي',
+  primary: 'المفتاح الأساسي (الجديد)',
+  legacy: 'المفتاح القديم (احتياطي)',
+};
+
+export const GEMINI_KEY_CHOICE_DESCRIPTIONS: Record<GeminiKeyChoice, string> = {
+  auto: 'يبدأ بالمفتاح الأساسي الجديد، ثم ينتقل للقديم عند فشله تلقائياً.',
+  primary: 'يستخدم المفتاح الأساسي الجديد فقط (مع fallback للمفتاح القديم).',
+  legacy: 'يبدأ بالمفتاح القديم، ثم ينتقل للجديد عند فشله. مفيد للمقارنة أو عند فشل الأساسي مؤقتاً.',
 };
 
 /** Voice language options for TTS. */

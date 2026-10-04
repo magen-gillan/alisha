@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AlishaSettings, ResponseLanguage, BackgroundId, AIProvider } from '@/lib/alisha/types';
+import type { AlishaSettings, ResponseLanguage, BackgroundId, AIProvider, GeminiKeyChoice } from '@/lib/alisha/types';
 import { DEPRECATED_MODELS } from '@/lib/alisha/gemini-client';
 
 export interface ChatMessage {
@@ -32,6 +32,7 @@ interface AlishaStore extends AlishaSettings {
   setModel: (model: string) => void;
   setPollinationsModel: (model: string) => void;
   setProvider: (provider: AIProvider) => void;
+  setGeminiKeyChoice: (choice: GeminiKeyChoice) => void;
   setSpeechRate: (rate: number) => void;
   setSpeechPitch: (pitch: number) => void;
   setApiKey: (key: string) => void;
@@ -77,6 +78,8 @@ const DEFAULTS: AlishaSettings & {
   pollinationsModel: 'openai-fast',
   // Default provider is Gemini (preserves existing user behaviour).
   provider: 'gemini',
+  // Default: prefer the new (primary) server key, fall back to legacy.
+  geminiKeyChoice: 'auto',
   speechRate: 1.0,
   speechPitch: 1.0,
   apiKey: '',
@@ -100,6 +103,7 @@ export const useAlishaStore = create<AlishaStore>()(
       setModel: (model) => set({ model }),
       setPollinationsModel: (model) => set({ pollinationsModel: model }),
       setProvider: (provider) => set({ provider }),
+      setGeminiKeyChoice: (choice) => set({ geminiKeyChoice: choice }),
       setSpeechRate: (rate) => set({ speechRate: rate }),
       setSpeechPitch: (pitch) => set({ speechPitch: pitch }),
       setApiKey: (key) => set({ apiKey: key }),
@@ -134,7 +138,7 @@ export const useAlishaStore = create<AlishaStore>()(
     }),
     {
       name: 'alisha-settings',
-      version: 6,
+      version: 7,
       // Don't persist conversation across reloads (it's "current session")
       partialize: (state) => ({
         responseLanguage: state.responseLanguage,
@@ -142,6 +146,7 @@ export const useAlishaStore = create<AlishaStore>()(
         model: state.model,
         pollinationsModel: state.pollinationsModel,
         provider: state.provider,
+        geminiKeyChoice: state.geminiKeyChoice,
         speechRate: state.speechRate,
         speechPitch: state.speechPitch,
         apiKey: state.apiKey,
@@ -171,6 +176,12 @@ export const useAlishaStore = create<AlishaStore>()(
         }
         if (typeof persisted.pollinationsApiKey !== 'string') {
           persisted.pollinationsApiKey = '';
+        }
+        // v6 → v7: add Gemini key choice. Default to 'auto' for existing users
+        // so they keep the same behaviour (primary first, legacy fallback).
+        if (typeof persisted.geminiKeyChoice !== 'string' ||
+            !['auto', 'primary', 'legacy'].includes(persisted.geminiKeyChoice)) {
+          persisted.geminiKeyChoice = 'auto';
         }
         return persisted;
       },

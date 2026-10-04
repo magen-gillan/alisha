@@ -34,6 +34,7 @@ import type {
   ResponseLanguage,
   BackgroundId,
   AIProvider,
+  GeminiKeyChoice,
 } from '@/lib/alisha/types';
 import {
   LANGUAGE_LABELS,
@@ -41,6 +42,8 @@ import {
   VOICE_LANGUAGES,
   PROVIDER_LABELS,
   PROVIDER_DESCRIPTIONS,
+  GEMINI_KEY_CHOICE_LABELS,
+  GEMINI_KEY_CHOICE_DESCRIPTIONS,
 } from '@/lib/alisha/types';
 import {
   listGeminiModels,
@@ -112,6 +115,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     pollinationsApiKey,
     pollinationsModel,
     provider,
+    geminiKeyChoice,
     permanentMemory,
     voiceLanguage,
     voiceURI,
@@ -121,6 +125,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     setModel,
     setPollinationsModel,
     setProvider,
+    setGeminiKeyChoice,
     setSpeechRate,
     setSpeechPitch,
     setApiKey,
@@ -185,9 +190,9 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
         setPollinationsModelsList(list);
         toast.success(`Pollinations يعمل — ${list.length} نماذج متاحة`);
       } else {
-        const list = await listGeminiModels(apiKeyInput.trim() || undefined);
+        const list = await listGeminiModels(apiKeyInput.trim() || undefined, geminiKeyChoice);
         setModels(list);
-        toast.success(`Gemini يعمل — ${list.length} نماذج متاحة`);
+        toast.success(`Gemini يعمل — ${list.length} نماذج متاحة (المفتاح: ${GEMINI_KEY_CHOICE_LABELS[geminiKeyChoice]})`);
       }
     } catch (err: any) {
       toast.error(err?.message || 'تعذر الاتصال بالمزود');
@@ -200,7 +205,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     setLoadingModels(true);
     setModelsError('');
     try {
-      const list = await listGeminiModels(apiKeyInput.trim() || undefined);
+      const list = await listGeminiModels(apiKeyInput.trim() || undefined, geminiKeyChoice);
       setModels(list);
       const stillAvailable = list.some((m) => m.name === model);
       if (!stillAvailable && list.length > 0) {
@@ -235,14 +240,22 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
   useEffect(() => {
     if (open && provider === 'gemini' && models.length === 0 && !loadingModels && !modelsError) {
       // Fetching here intentionally updates loading/error state from an external API.
-       
+
       void fetchModels();
     }
     if (open && provider === 'pollinations' && pollinationsModels.length === 0 && !loadingPollinationsModels && !pollinationsModelsError) {
-       
+
       void fetchPollinationsModels();
     }
   }, [open, provider, models.length, loadingModels, modelsError, pollinationsModels.length, loadingPollinationsModels, pollinationsModelsError]);
+
+  // When the Gemini key choice changes, invalidate the cached model list so
+  // the next open re-fetches from the newly preferred key. We don't auto-fetch
+  // here to avoid surprising the user with API calls every time they click.
+  useEffect(() => {
+    setModels([]);
+    setModelsError('');
+  }, [geminiKeyChoice]);
 
   const handleApiKeyChange = (value: string) => {
     setApiKeyInput(value);
@@ -266,7 +279,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
   const keySourceLabel = apiKey
     ? 'مفتاح Gemini محلي مخصص'
     : usingBaked
-      ? 'مفتاح Gemini الخادمي السري'
+      ? `مفتاح Gemini الخادمي (${GEMINI_KEY_CHOICE_LABELS[geminiKeyChoice]})`
       : 'لا يوجد مفتاح Gemini';
 
   const pollinationsUsingBaked = isUsingBakedPollinationsKey() && !pollinationsApiKey;
@@ -424,6 +437,43 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                     >
                       {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
+                  </div>
+                </div>
+
+                {/* Gemini server-side key choice */}
+                <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-3">
+                  <Label className="text-sm font-medium">مفتاح Gemini الخادمي</Label>
+                  <p className="text-xs text-muted-foreground">
+                    الموقع يدعم مفتاحين Gemini في نفس الوقت. اختر أيهما يُجرّب أولاً. الآخر يُستخدم تلقائياً عند فشل الأول.
+                  </p>
+                  <div className="grid grid-cols-1 gap-1.5 mt-1">
+                    {(['auto', 'primary', 'legacy'] as GeminiKeyChoice[]).map((choice) => {
+                      const isSelected = geminiKeyChoice === choice;
+                      return (
+                        <button
+                          key={choice}
+                          type="button"
+                          onClick={() => setGeminiKeyChoice(choice)}
+                          className={`text-right rounded-md border-2 p-2.5 transition-all ${
+                            isSelected
+                              ? 'border-primary bg-primary/10'
+                              : 'border-white/10 bg-white/5 hover:border-muted-foreground/30'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold">
+                              {GEMINI_KEY_CHOICE_LABELS[choice]}
+                            </span>
+                            {isSelected && (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {GEMINI_KEY_CHOICE_DESCRIPTIONS[choice]}
+                          </p>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 

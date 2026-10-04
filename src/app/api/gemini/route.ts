@@ -4,17 +4,18 @@ export const runtime = 'nodejs';
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 /**
- * Resolve the API key to use.
+ * Resolve the API keys to use, in priority order.
  *
  * Order of precedence:
  *   1. Client-supplied key (user's own key from the settings UI)
- *   2. Primary server key: GEMINI_API_KEY (the new active key)
- *   3. Legacy fallback: GEMINI_API_KEY_LEGACY (the previous key, kept as backup)
+ *   2. Server-side keys, ordered by the user's `keyChoice` setting:
+ *      - `auto` / `primary`: GEMINI_API_KEY → GEMINI_API_KEY_LEGACY
+ *      - `legacy`           : GEMINI_API_KEY_LEGACY → GEMINI_API_KEY
  *
  * Both keys coexist on Vercel so we can fall back if the primary ever fails
  * (quota exhaustion, key rotation, transient auth errors, etc).
  */
-function resolveKeys(clientKey: string | undefined | null): string[] {
+function resolveKeys(clientKey: string | undefined | null, keyChoice: string | undefined | null): string[] {
   const keys: string[] = [];
   const ck = (clientKey || '').trim();
   if (ck) {
@@ -22,9 +23,20 @@ function resolveKeys(clientKey: string | undefined | null): string[] {
     return [ck];
   }
   const primary = (process.env.GEMINI_API_KEY || '').trim();
-  if (primary) keys.push(primary);
   const legacy = (process.env.GEMINI_API_KEY_LEGACY || '').trim();
-  if (legacy && legacy !== primary) keys.push(legacy);
+
+  // Normalize the choice.
+  const choice = (keyChoice || 'auto').trim().toLowerCase();
+  const preferLegacy = choice === 'legacy';
+
+  if (preferLegacy) {
+    if (legacy) keys.push(legacy);
+    if (primary && primary !== legacy) keys.push(primary);
+  } else {
+    // 'auto' or 'primary' → start with the primary (new) key.
+    if (primary) keys.push(primary);
+    if (legacy && legacy !== primary) keys.push(legacy);
+  }
   return keys;
 }
 
@@ -32,7 +44,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const clientKey = typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
-    const apiKeys = resolveKeys(clientKey);
+    const keyChoice = request.headers.get('x-gemini-key-choice')?.trim() || undefined;
+    const apiKeys = resolveKeys(clientKey, keyChoice);
     if (apiKeys.length === 0) {
       return NextResponse.json(
         { error: { message: 'لم تتم إضافة GEMINI_API_KEY في إعدادات Vercel بعد.' } },
@@ -152,7 +165,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const clientKey = request.headers.get('x-client-key')?.trim();
-  const apiKeys = resolveKeys(clientKey);
+  const keyChoice = request.headers.get('x-gemini-key-choice')?.trim() || undefined;
+  const apiKeys = resolveKeys(clientKey, keyChoice);
   if (apiKeys.length === 0) {
     return NextResponse.json(
       { error: { message: 'لم تتم إضافة GEMINI_API_KEY في إعدادات Vercel بعد.' } },
