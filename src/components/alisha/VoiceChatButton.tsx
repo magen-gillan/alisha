@@ -139,7 +139,9 @@ export default function VoiceChatButton({
     abortRef.current = controller;
     try {
       const detected = detectLanguage(userText);
-      console.log(`[VoiceChat] input="${userText}" detected=${detected} → ${responseLanguage} via ${provider}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[VoiceChat] lang=${detected} → ${responseLanguage} via ${provider} (${userText.length} chars)`);
+      }
 
       const chatReq = {
         userInput: userText,
@@ -164,7 +166,7 @@ export default function VoiceChatButton({
       // Speak the response
       setState('speaking');
       onThinkingChange(false);
-      onSpeakingChange(false);
+      onSpeakingChange(true);
 
       speak({
         text: chat.text,

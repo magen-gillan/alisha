@@ -78,6 +78,7 @@ import {
   Trash2,
   CheckCircle2,
   Save,
+  X,
 } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -307,11 +308,17 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
         side="right"
         className="w-full sm:max-w-md overflow-y-auto flex flex-col gap-4 border-l border-white/20 bg-[#241b35]/95 p-0 text-white shadow-2xl backdrop-blur-2xl"
       >
-        <SheetHeader className="border-b border-white/10 bg-gradient-to-br from-fuchsia-500/20 via-violet-500/10 to-transparent px-5 pb-4 pt-6">
+        <SheetHeader className="border-b border-white/10 bg-gradient-to-br from-fuchsia-500/20 via-violet-500/10 to-transparent px-5 pb-4 pt-6 relative">
           <SheetTitle className="text-2xl font-bold tracking-tight text-white">Alisha Settings</SheetTitle>
-              <SheetDescription>
-            خصّص المزود والمشهد والصوت والذاكرة، ثم اضغط حفظ التغييرات لتأكيدها.
-          </SheetDescription>
+          <SheetDescription className="sr-only">Alisha settings panel</SheetDescription>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="absolute top-3 right-3 z-30 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            aria-label="Close settings"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </SheetHeader>
 
         <ScrollArea className="flex-1 px-5 pb-5">
@@ -329,10 +336,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                 </span>
               </AccordionTrigger>
               <AccordionContent className="space-y-3 pt-2">
-                <p className="text-xs text-muted-foreground">
-                  اختر المزود الذي سيولّد الردود النصية. الصوت يُولّد دائماً عبر متصفحك (Web Speech API) بغض النظر عن المزود المختار.
-                </p>
-
                 <div className="grid grid-cols-1 gap-2">
                   {(Object.keys(PROVIDER_LABELS) as AIProvider[]).map((p) => {
                     const isSelected = provider === p;
@@ -355,23 +358,9 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                             <CheckCircle2 className="w-4 h-4 text-primary" />
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {PROVIDER_DESCRIPTIONS[p]}
-                        </p>
                       </button>
                     );
                   })}
-                </div>
-
-                {/* Active provider summary */}
-                <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-white/70">المزود النشط حالياً</span>
-                    <Badge variant="secondary" className="text-[10px] gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      {PROVIDER_LABELS[provider]}
-                    </Badge>
-                  </div>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -386,22 +375,8 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
               </AccordionTrigger>
               <AccordionContent className="space-y-3 pt-2">
                 <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                      <span className="text-xs text-white/70">مصدر المفتاح المستخدم فعلياً</span>
+                      <span className="text-xs text-white/70">مصدر المفتاح</span>
                   <Badge variant={hasKey ? 'secondary' : 'destructive'} className="text-[10px]">{keySourceLabel}</Badge>
-                </div>
-
-                {/* API key status badge */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  {hasKey ? (
-                    <Badge variant="secondary" className="text-xs gap-1 bg-emerald-100 text-emerald-700">
-                      <CheckCircle2 className="w-3 h-3" />
-                      {usingBaked ? 'يستخدم مفتاح المستودع' : 'مفتاح مخصص'}
-                    </Badge>
-                  ) : (
-                    <Badge variant="destructive" className="text-xs">
-                      لا يوجد مفتاح
-                    </Badge>
-                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -416,15 +391,12 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                       احصل على مفتاح <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    اختياري — يُستخدم مفتاح المستودع تلقائياً. اتركه فارغاً لاستخدام مفتاح المستودع.
-                  </p>
                   <div className="relative">
                     <input
                       type={showApiKey ? 'text' : 'password'}
                       value={apiKeyInput}
                       onChange={(e) => handleApiKeyChange(e.target.value)}
-                      placeholder="اتركه فارغاً لاستخدام مفتاح المستودع"
+                      placeholder=""
                       className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       autoComplete="off"
                       spellCheck={false}
@@ -443,9 +415,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                 {/* Gemini server-side key choice */}
                 <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-3">
                   <Label className="text-sm font-medium">مفتاح Gemini الخادمي</Label>
-                  <p className="text-xs text-muted-foreground">
-                    الموقع يدعم مفتاحين Gemini في نفس الوقت. اختر أيهما يُجرّب أولاً. الآخر يُستخدم تلقائياً عند فشل الأول.
-                  </p>
                   <div className="grid grid-cols-1 gap-1.5 mt-1">
                     {(['auto', 'primary', 'legacy'] as GeminiKeyChoice[]).map((choice) => {
                       const isSelected = geminiKeyChoice === choice;
@@ -468,9 +437,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                               <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
                             )}
                           </div>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            {GEMINI_KEY_CHOICE_DESCRIPTIONS[choice]}
-                          </p>
                         </button>
                       );
                     })}
@@ -490,7 +456,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                         className="h-7 px-2"
                       >
                         {loadingModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                        <span className="ml-1 text-xs">تحديث</span>
                       </Button>
                       <Button
                         variant="outline"
@@ -500,7 +465,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                         className="h-7 px-2 border-emerald-300/30"
                       >
                         {testingConnection ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-                        <span className="ml-1 text-xs">اختبار</span>
                       </Button>
                     </div>
                   </div>
@@ -516,8 +480,8 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                     disabled={loadingModels && models.length === 0}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="اختر موديلاً">
-                        {model || 'اختر موديلاً'}
+                      <SelectValue placeholder="">
+                        {model || ''}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
@@ -537,17 +501,12 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                       )}
                     </SelectContent>
                   </Select>
-                  <p className="text-[10px] text-muted-foreground">
-                    {models.length > 0
-                      ? `${models.length} موديل متاح لهذا المفتاح`
-                      : 'جارٍ تحميل الموديلات…'}
-                  </p>
                 </div>
 
                 {/* ============ Pollinations API key ============ */}
                 <div className="mt-5 pt-4 border-t border-white/10">
                   <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                    <span className="text-xs text-white/70">مصدر مفتاح Pollinations</span>
+                    <span className="text-xs text-white/70">مفتاح Pollinations</span>
                     <Badge variant={pollinationsHasSource ? 'secondary' : 'destructive'} className="text-[10px]">
                       {pollinationsKeySourceLabel}
                     </Badge>
@@ -555,7 +514,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium">مفتاح Pollinations API (اختياري)</Label>
+                      <Label className="text-sm font-medium">مفتاح Pollinations</Label>
                       <a
                         href="https://pollinations.ai/"
                         target="_blank"
@@ -565,15 +524,12 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                         Pollinations.ai <ExternalLink className="w-3 h-3" />
                       </a>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      اختياري — Pollinations يعمل بدون مفتاح (طبقة مجهولة). إضافة مفتاح مسجّل يفتح نماذج إضافية ويستخدم حصة المستخدم الخاصة.
-                    </p>
                     <div className="relative">
                       <input
                         type={showPollinationsKey ? 'text' : 'password'}
                         value={pollinationsKeyInput}
                         onChange={(e) => handlePollinationsKeyChange(e.target.value)}
-                        placeholder="sk_..."
+                        placeholder=""
                         className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                         autoComplete="off"
                         spellCheck={false}
@@ -602,7 +558,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                           className="h-7 px-2"
                         >
                           {loadingPollinationsModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                          <span className="ml-1 text-xs">تحديث</span>
                         </Button>
                       </div>
                     </div>
@@ -622,8 +577,8 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                       disabled={loadingPollinationsModels && pollinationsModels.length === 0}
                     >
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="اختر موديلاً">
-                          {pollinationsModel || 'openai-fast'}
+                        <SelectValue placeholder="">
+                          {pollinationsModel || ''}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -643,13 +598,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                         )}
                       </SelectContent>
                     </Select>
-                    <p className="text-[10px] text-muted-foreground">
-                      {pollinationsModels.length > 0
-                        ? `${pollinationsModels.length} موديل متاح`
-                        : loadingPollinationsModels
-                          ? 'جارٍ تحميل موديلات Pollinations…'
-                          : 'اضغط "تحديث" لجلب الموديلات المتاحة'}
-                    </p>
                   </div>
                 </div>
               </AccordionContent>
@@ -664,9 +612,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                 </span>
               </AccordionTrigger>
               <AccordionContent className="space-y-3 pt-2">
-                <p className="text-xs text-muted-foreground">
-                  النموذج الحالي: <span className="font-medium">Kei (Cubism 4)</span>
-                </p>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -736,9 +681,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                 {/* Response language */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">لغة الرد</Label>
-                  <p className="text-xs text-muted-foreground">
-                    سترد اليشيا بهذه اللغة بغض النظر عن لغة الإدخال.
-                  </p>
                   <Select
                     value={responseLanguage}
                     onValueChange={(v) => {
@@ -767,9 +709,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                     <Volume2 className="w-3.5 h-3.5" />
                     لغة الصوت (TTS)
                   </Label>
-                  <p className="text-xs text-muted-foreground">
-                    لغة الصوت هي لغة الرد أيضاً؛ عند تغييرها تتغير لغة Gemini تلقائياً.
-                  </p>
                   <Select
                     value={voiceLanguage}
                     onValueChange={(v) => {
@@ -794,9 +733,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                 {/* Specific voice */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">الصوت المحدد</Label>
-                  <p className="text-xs text-muted-foreground">
-                    اختر صوتاً محدداً من الأصوات المتاحة للغة المختارة.
-                  </p>
                   {voices.length === 0 ? (
                     <div className="text-xs text-muted-foreground italic p-2 border rounded-md bg-muted/30">
                       لا توجد أصوات متاحة لهذه اللغة في متصفحك.
@@ -955,16 +891,12 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                 </span>
               </AccordionTrigger>
               <AccordionContent className="space-y-3 pt-2">
-                <p className="text-xs text-muted-foreground">
-                  هذه التعليمات تُحقن في كل طلب إلى Gemini ولا تُنسى أبداً، حتى لو بدأت محادثة جديدة.
-                  مثلاً: اسم المستخدم، اسم اليشيا، تعليمات دائمة.
-                </p>
                 <Textarea
                   value={permanentMemory}
                   onChange={(e) => setPermanentMemory(e.target.value)}
                   rows={10}
                   className="font-mono text-xs"
-                  placeholder="اكتب التعليمات الدائمة هنا…"
+                  placeholder=""
                 />
                 <div className="flex items-center gap-2">
                   <Button
@@ -975,9 +907,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                   >
                     استعادة الافتراضي
                   </Button>
-                  <span className="text-[10px] text-muted-foreground ml-auto">
-                    {permanentMemory.length} حرف
-                  </span>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -987,27 +916,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
             <Button onClick={handleSave} className="w-full bg-gradient-to-r from-fuchsia-500 to-violet-600 text-white shadow-lg shadow-fuchsia-900/30 hover:from-fuchsia-400 hover:to-violet-500">
               {saved ? <CheckCircle2 className="mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
               {saved ? 'تم حفظ التغييرات' : 'حفظ التغييرات'}
-            </Button>
-          </div>
-
-          {/* Reset all */}
-          <div className="mt-3 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (
-                  confirm(
-                    'إعادة ضبط كل الإعدادات إلى الافتراضي؟ لا يمكن التراجع.'
-                  )
-                ) {
-                  reset();
-                }
-              }}
-              className="w-full text-destructive hover:text-destructive"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              إعادة ضبط كل الإعدادات
             </Button>
           </div>
         </ScrollArea>

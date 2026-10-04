@@ -69,6 +69,7 @@ export default function Home() {
   // Set document direction based on response language for Arabic
   useEffect(() => {
     if (typeof document === 'undefined') return;
+    document.documentElement.lang = responseLanguage;
     document.documentElement.dir = responseLanguage === 'ar' ? 'rtl' : 'ltr';
   }, [responseLanguage]);
 
@@ -88,14 +89,9 @@ export default function Home() {
             alt="Alisha"
             className="h-10 w-10 rounded-full border border-white/40 object-cover shadow-lg shadow-fuchsia-900/30"
           />
-          <div className="flex flex-col">
-            <span className="text-base sm:text-lg font-semibold text-white drop-shadow">
-              Alisha
-            </span>
-            <span className="text-[10px] text-white/70 drop-shadow">
-              Live2D · AI Avatar
-            </span>
-          </div>
+          <span className="text-base sm:text-lg font-semibold text-white drop-shadow">
+            Alisha
+          </span>
         </div>
 
         <div className="flex items-center gap-2">

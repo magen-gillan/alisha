@@ -60,17 +60,21 @@ export function isUsingBakedPollinationsKey(): boolean {
 }
 
 /**
- * GET /models — list models available on Pollinations.
+ * GET — list models available on Pollinations.
  *
  * Anonymous tier returns a single model (openai-fast). With a registered
  * API key (sk_...) more models become available.
+ *
+ * NOTE: The Next.js App Router maps /api/pollinations to route.ts which
+ * exports both GET and POST handlers. We hit the same URL for both methods
+ * (no /models or /chat suffix) so the routing works correctly.
  */
 export async function listPollinationsModels(apiKey?: string): Promise<GeminiModel[]> {
   const key = apiKey || getPollinationsApiKey();
   const headers: Record<string, string> = {};
   if (key) headers['x-client-key'] = key;
 
-  const resp = await fetch(`${API_BASE}/models`, { headers });
+  const resp = await fetch(API_BASE, { headers });
   const data = await resp.json();
 
   if (!resp.ok) {
@@ -167,7 +171,7 @@ export async function chatWithPollinations(req: ChatRequest, apiKey?: string): P
   };
   if (key) body.apiKey = key;
 
-  const resp = await fetch(`${API_BASE}/chat`, {
+  const resp = await fetch(API_BASE, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
