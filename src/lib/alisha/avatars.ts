@@ -23,6 +23,12 @@ export interface AvatarModel {
   emoji?: string;
   /** Optional thumbnail image URL (small preview shown in the picker). */
   thumbnailUrl?: string;
+  /**
+   * MOC3 format version this model uses. The bundled Cubism Core
+   * (v5, 2024+) supports versions 1-5. Older cores (2019) only support
+   * 1-4, so v5 models (Kei, Jane) would silently fail to render.
+   */
+  moc3Version?: 3 | 4 | 5;
 }
 
 export const AVATAR_MODELS: AvatarModel[] = [
@@ -33,6 +39,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Cubism 4 Sample',
     emoji: '👧',
     thumbnailUrl: '/live2d/thumbnails/kei.png',
+    moc3Version: 5,
   },
   {
     id: 'jane',
@@ -41,6 +48,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Chinese-style avatar',
     emoji: '🧝',
     thumbnailUrl: '/live2d/thumbnails/jane.png',
+    moc3Version: 5,
   },
   {
     id: 'icegirl',
@@ -49,6 +57,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Ice-themed avatar',
     emoji: '❄️',
     thumbnailUrl: '/live2d/thumbnails/icegirl.png',
+    moc3Version: 4,
   },
   {
     id: 'ganyu',
@@ -57,6 +66,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Genshin Impact style',
     emoji: '🐉',
     thumbnailUrl: '/live2d/thumbnails/ganyu.png',
+    moc3Version: 4,
   },
   {
     id: 'miara',
@@ -65,6 +75,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Pro avatar with motions',
     emoji: '✨',
     thumbnailUrl: '/live2d/thumbnails/miara.png',
+    moc3Version: 3,
   },
 ];
 

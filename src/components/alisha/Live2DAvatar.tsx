@@ -13,33 +13,60 @@ interface Live2DAvatarProps {
 }
 
 /**
- * Live2DAvatar — completely rewritten for reliable centering.
+ * Live2DAvatar — supports runtime avatar switching.
  *
- * Root cause of previous bug:
- *   The old `fitModel()` read `model.originalWidth || model.width`. If
- *   `originalWidth` was undefined, it fell back to `model.width` which
- *   is the CURRENT scaled bounds. On every resize this compounded the
- *   scale error. Additionally, the manual `x`/`y` math assumed the
- *   model's anchor was at (0,0) top-left, but pixi-live2d-display's
- *   internal coordinate origin doesn't always match the visible bounds.
+ * Key implementation notes:
  *
- * New approach (much simpler & robust):
- *   1. Set `model.anchor.set(0.5, 0.5)` — the anchor becomes the
- *      model's CENTER, in normalized [0..1] coordinates relative to
- *      the model's own canvas.
- *   2. Position: `model.x = renderer.width / 2`, `model.y = renderer.height / 2`
- *      — perfect centering, no manual width math.
- *   3. Scale: read `model.internalModel.originalWidth/Height` (the raw
- *      canvas size from the model3.json Geometry, never changes), compute
- *      `scale = min(rw/mw, rh/mh) * 0.9` so the model always fits with
- *      a 10% margin.
- *   4. ResizeObserver on the container triggers a refit when the
- *      viewport changes (keyboard open/close, orientation change, etc.)
+ * 1. **Canvas lifecycle**: Each avatar switch creates a FRESH <canvas>
+ *    element via React's `key` prop. This avoids the "canvas already in
+ *    use" error that occurs when PIXI tries to attach a new Application
+ *    to a canvas that was previously bound to a destroyed app.
  *
- * If Live2D fails to load (CORS, missing files, etc.), the component
- * gracefully falls back to a static SVG illustration.
+ * 2. **Cleanup ordering**: When avatarId changes, the cleanup function
+ *    runs in this exact order:
+ *      a. Set `cancelled = true` (so async init bails out)
+ *      b. Cancel requestAnimationFrame loop
+ *      c. Disconnect ResizeObserver
+ *      d. Remove window listeners
+ *      e. Destroy the Live2D model (releases textures, mesh data)
+ *      f. Destroy the PIXI Application (releases WebGL context)
+ *      g. Null out refs
+ *
+ * 3. **MOC3 version compatibility**: pixi-live2d-display@0.4.0 ships with
+ *    Cubism Core from 2019, which only supports MOC3 versions 1-4. Models
+ *    exported with Cubism Editor 5.0+ have MOC3 version 5 and will fail
+ *    to load with a "MOC3 version mismatch" error. The catch block falls
+ *    back to a static image so the UI stays usable.
+ *
+ * 4. **WebGL context leak prevention**: PIXI's `destroy(true)` also
+ *    destroys the canvas. We pass `true` to ensure the WebGL context is
+ *    released, otherwise the browser caps out at ~16 contexts.
  */
+
+interface InitState {
+  app: any;
+  model: any;
+  raf: number | null;
+  resizeObserver: ResizeObserver | null;
+  onResize: (() => void) | null;
+}
+
 export default function Live2DAvatar({
+  background,
+  speaking,
+  listening,
+  thinking,
+  avatarId,
+}: Live2DAvatarProps) {
+  // Use a `key` that changes with avatarId so React fully unmounts + remounts
+  // the entire canvas subtree. This is the SIMPLEST and most reliable way to
+  // guarantee a fresh canvas + fresh PIXI Application on every switch.
+  // (PIXI throws "Canvas already in use" if you reuse a canvas that was
+  // bound to a previously-destroyed Application — even after destroy(true).)
+  return <AvatarInstance key={avatarId} background={background} speaking={speaking} listening={listening} thinking={thinking} avatarId={avatarId} />;
+}
+
+function AvatarInstance({
   background,
   speaking,
   listening,
@@ -58,19 +85,11 @@ export default function Live2DAvatar({
   const speakingRef = useRef(speaking);
   const listeningRef = useRef(listening);
   const thinkingRef = useRef(thinking);
-  useEffect(() => {
-    speakingRef.current = speaking;
-  }, [speaking]);
-  useEffect(() => {
-    listeningRef.current = listening;
-  }, [listening]);
-  useEffect(() => {
-    thinkingRef.current = thinking;
-  }, [thinking]);
+  useEffect(() => { speakingRef.current = speaking; }, [speaking]);
+  useEffect(() => { listeningRef.current = listening; }, [listening]);
+  useEffect(() => { thinkingRef.current = thinking; }, [thinking]);
 
   // ---- Live2D init ----
-  // Re-init whenever the avatarId changes (so the user can switch avatars
-  // at runtime). The init function reads avatarId from the closure.
   useEffect(() => {
     const avatar = getAvatarById(avatarId);
     let cancelled = false;
@@ -81,9 +100,10 @@ export default function Live2DAvatar({
     async function init() {
       if (!canvasRef.current || !containerRef.current) return;
       setLoadState('loading');
+      setErrorMsg('');
 
       try {
-        // 1) Load Cubism Core runtime
+        // 1) Load Cubism Core runtime (only once globally)
         if (!(window as any).Live2DCubismCore) {
           await new Promise<void>((resolve, reject) => {
             const s = document.createElement('script');
@@ -104,7 +124,7 @@ export default function Live2DAvatar({
           live2dModule.Live2DModel || live2dModule.default?.Live2DModel;
 
         if (!Live2DModel) {
-          throw new Error('Live2DModel constructor not found in pixi-live2d-display.');
+          throw new Error('Live2DModel constructor not found.');
         }
 
         const TickerRef = PIXI.Ticker || PIXI_MODULE.Ticker;
@@ -122,8 +142,9 @@ export default function Live2DAvatar({
 
         if (cancelled) return;
 
-        // 3) Create PIXI application — explicitly sized to the container
-        //    so the renderer always matches the visible area.
+        // 3) Create PIXI application with a FRESH canvas (we rely on the
+        //    parent `key={avatarId}` to give us a new <canvas> element
+        //    each time, so canvasRef.current is always pristine).
         const cw0 = containerRef.current.clientWidth || 512;
         const ch0 = containerRef.current.clientHeight || 512;
         const app = new PIXI.Application({
@@ -138,45 +159,56 @@ export default function Live2DAvatar({
         });
         pixiAppRef.current = app;
 
-        // 4) Load the Live2D model selected by the user.
+        // 4) Load the Live2D model.
+        //    Wrap in a try/catch with a clearer error message so the user
+        //    knows if their MOC3 version is unsupported by Cubism Core.
         const modelUrl = avatar.modelUrl;
-        const model = await Live2DModel.from(modelUrl);
+        let model: any;
+        try {
+          model = await Live2DModel.from(modelUrl, {
+            // Pass an error handler so we can surface MOC3 version issues.
+            onError: (err: any) => {
+              console.error('[Live2DAvatar] model load error:', err);
+            },
+          });
+        } catch (modelErr: any) {
+          const msg = String(modelErr?.message || '').toLowerCase();
+          if (msg.includes('moc') || msg.includes('version') || msg.includes('inconsistent')) {
+            throw new Error(
+              'This avatar uses a newer MOC3 format (v5) that the bundled Cubism Core (2019) cannot read. ' +
+              'Please use Kei, IceGirl, Gan Yu, or Miara — they use MOC3 v3/v4 which is supported.'
+            );
+          }
+          throw modelErr;
+        }
+
         if (cancelled) {
-          try {
-            model.destroy();
-          } catch {}
+          try { model.destroy(); } catch {}
           return;
         }
         modelRef.current = model;
         app.stage.addChild(model);
 
-        // 5) Anchor at center — this is the key fix.
-        //    After this, model.x/y position the model's CENTER, not its
-        //    top-left corner. This makes centering trivial and reliable.
+        // 5) Anchor at center
         try {
           model.anchor.set(0.5, 0.5);
         } catch {
-          // Some versions of pixi-live2d-display don't support anchor;
-          // fall back to manual centering using getBounds().
+          // Some versions don't support anchor — fall back to manual centering.
         }
 
-        // 6) Fit model to container — read ORIGINAL dimensions from
-        //    internalModel (these never change, even after scaling).
+        // 6) Fit model to container
         const fitModel = () => {
           if (!modelRef.current || !containerRef.current || !pixiAppRef.current) return;
           const cw = containerRef.current.clientWidth;
           const ch = containerRef.current.clientHeight;
           if (!cw || !ch) return;
 
-          // Resize the PIXI renderer to match the container.
           try {
             pixiAppRef.current.renderer.resize(cw, ch);
           } catch {
             /* noop */
           }
 
-          // Original canvas size from the model3.json file.
-          // Try multiple sources in order of reliability.
           const internal = modelRef.current.internalModel;
           const mw =
             internal?.originalWidth ||
@@ -191,37 +223,22 @@ export default function Live2DAvatar({
             modelRef.current.height ||
             1024;
 
-          // Scale so the model fits inside the container with a 10% margin.
-          // Use Math.min so neither dimension overflows.
           const scale = Math.min(cw / mw, ch / mh) * 0.9;
-          try {
-            modelRef.current.scale.set(scale);
-          } catch {
-            /* noop */
-          }
-
-          // Center on stage. Because anchor is (0.5, 0.5), setting
-          // x/y to the renderer center puts the model's center there.
+          try { modelRef.current.scale.set(scale); } catch {}
           try {
             modelRef.current.x = cw / 2;
             modelRef.current.y = ch / 2;
-          } catch {
-            /* noop */
-          }
+          } catch {}
         };
 
         fitModel();
         fitModelRef.current = fitModel;
 
-        // Watch container size to refit when keyboard opens/closes
         if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
-          resizeObserver = new ResizeObserver(() => {
-            fitModel();
-          });
+          resizeObserver = new ResizeObserver(() => { fitModel(); });
           resizeObserver.observe(containerRef.current);
         }
 
-        // Also handle window resize as fallback
         onResize = () => fitModel();
         window.addEventListener('resize', onResize);
         window.addEventListener('orientationchange', onResize);
@@ -245,9 +262,6 @@ export default function Live2DAvatar({
                 }
               };
 
-              // Approximate natural syllable timing instead of a fast sinusoid.
-              // Targets change every 90–220ms and ease toward the next target,
-              // which looks closer to speech and avoids a mechanical vibration.
               if (speakingRef.current) {
                 if (now >= nextMouthChange) {
                   mouthTarget = Math.random() < 0.22 ? 0.04 : 0.14 + Math.random() * 0.68;
@@ -260,7 +274,6 @@ export default function Live2DAvatar({
               mouthValue += (mouthTarget - mouthValue) * (speakingRef.current ? 0.16 : 0.24);
               setParameter('ParamMouthOpenY', Math.max(0, Math.min(1, mouthValue)));
 
-              // Natural periodic blinking, suspended briefly while speaking.
               if (!speakingRef.current && now >= nextBlink) {
                 blinkUntil = now + 135;
                 nextBlink = now + 2200 + Math.random() * 2400;
@@ -269,7 +282,7 @@ export default function Live2DAvatar({
               setParameter('ParamEyeLOpen', eye);
               setParameter('ParamEyeROpen', eye);
             } catch {
-              /* noop: keep rendering even if a model build lacks a parameter */
+              /* noop */
             }
           }
           raf = requestAnimationFrame(tick);
@@ -278,6 +291,7 @@ export default function Live2DAvatar({
 
         setLoadState('ready');
       } catch (err: any) {
+        if (cancelled) return;
         console.error('[Live2DAvatar] init failed:', err);
         setErrorMsg(err?.message || 'Unknown error');
         setLoadState('failed');
@@ -297,47 +311,31 @@ export default function Live2DAvatar({
         window.removeEventListener('resize', onResize);
         window.removeEventListener('orientationchange', onResize);
       }
-      try {
-        modelRef.current?.destroy?.();
-      } catch {}
-      try {
-        pixiAppRef.current?.destroy?.(true);
-      } catch {}
+      // Destroy model FIRST, then the app — this releases textures
+      // that the renderer holds, avoiding WebGL context leaks.
+      try { modelRef.current?.destroy?.(); } catch {}
+      try { pixiAppRef.current?.destroy?.(true); } catch {}
       modelRef.current = null;
       pixiAppRef.current = null;
+      fitModelRef.current = null;
     };
   }, [avatarId]);
 
-  // NOTE: Previously this effect called `modelRef.current.motion('Idle')`
-  // every time listening/thinking toggled, which visibly restarted the idle
-  // animation and caused a stutter. The animation loop (requestAnimationFrame
-  // in the init effect) already drives the mouth / eyes continuously, so we
-  // don't need to re-trigger motions here. State changes are reflected
-  // through the speakingRef/listeningRef/thinkingRef refs that the loop reads.
-
   /**
-   * Tap the avatar to trigger a random expression (if the loaded model
-   * has any expression files). Falls back to the 'TapBody' motion group
-   * for models that have it (Kei, Miara).
+   * Tap the avatar to trigger a random expression (if available).
    */
   const handleTap = () => {
     if (loadState !== 'ready' || !modelRef.current) return;
     try {
       const internal = modelRef.current.internalModel;
-      // Some models expose expressions via the .model3.json FileReferences.
-      // pixi-live2d-display auto-loads them and exposes them as
-      // `model.internalModel.motion` and `model.expression`.
-      // We try expression first, then motion('TapBody').
       const tryExpression = (modelRef.current as any).expression;
       if (typeof tryExpression === 'function') {
-        // Pick a random expression index (capped to avoid OOB).
         const n = internal?.settings?.expressions?.length || 0;
         if (n > 0) {
           tryExpression(Math.floor(Math.random() * n));
           return;
         }
       }
-      // Fallback: trigger TapBody motion group (Kei has it).
       modelRef.current.motion('TapBody');
     } catch {
       /* noop */
@@ -359,7 +357,6 @@ export default function Live2DAvatar({
         }
       }}
     >
-      {/* Live2D canvas — fills container */}
       <canvas
         ref={canvasRef}
         className={`w-full h-full block transition-opacity duration-500 ${
@@ -367,7 +364,6 @@ export default function Live2DAvatar({
         }`}
       />
 
-      {/* Fallback SVG avatar (shown while loading or if Live2D fails) */}
       {loadState !== 'ready' && (
         <FallbackAvatar
           speaking={speaking}
@@ -377,7 +373,6 @@ export default function Live2DAvatar({
         />
       )}
 
-      {/* Status ring around avatar */}
       <div
         className={`pointer-events-none absolute inset-0 rounded-full transition-all duration-300 ${
           speaking
