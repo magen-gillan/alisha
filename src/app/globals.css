@@ -223,3 +223,17 @@ button, [role="button"] { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
+
+
+/* ===== Audio equalizer animation (TTS speaking indicator) ===== */
+@keyframes alisha-eq {
+  0%, 100% { height: 30%; opacity: 0.5; }
+  50% { height: 90%; opacity: 1; }
+}
+.animate-eq {
+  animation: alisha-eq 600ms ease-in-out infinite;
+  transform-origin: bottom;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-eq { animation: none; height: 50% !important; opacity: 0.6 !important; }
+}

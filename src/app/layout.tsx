@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import ServiceWorkerRegister from "@/components/alisha/ServiceWorkerRegister";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,10 +20,16 @@ export const metadata: Metadata = {
     "An interactive Live2D avatar powered by Gemini AI. Speak or type in any language; Alisha responds by voice in your chosen language.",
   keywords: ["Alisha", "Live2D", "Gemini", "AI Avatar", "Voice Chat", "Next.js"],
   authors: [{ name: "Alisha Project" }],
+  manifest: "/manifest.json",
   icons: {
     icon: '/alisha-new-icon.png',
     shortcut: '/alisha-new-icon.png',
     apple: '/alisha-new-icon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Alisha',
   },
   openGraph: {
     title: "Alisha — Live2D Avatar with Gemini AI",
@@ -41,11 +48,11 @@ export const metadata: Metadata = {
 // `interactive-widget=resizes-content` makes the layout viewport shrink when
 // the on-screen keyboard appears, so our fixed-position UI (avatar, buttons,
 // text input) all stay visible above the keyboard.
+// We intentionally do NOT set maximumScale/userScalable — pinch-to-zoom is
+// preserved for accessibility (WCAG 1.4.4).
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
 };
@@ -62,6 +69,7 @@ export default function RootLayout({
       >
         {children}
         <Toaster />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

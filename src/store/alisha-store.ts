@@ -138,8 +138,9 @@ export const useAlishaStore = create<AlishaStore>()(
     }),
     {
       name: 'alisha-settings',
-      version: 7,
-      // Don't persist conversation across reloads (it's "current session")
+      version: 8,
+      // Persist conversation across reloads too — the user often wants to
+      // continue where they left off after closing the tab.
       partialize: (state) => ({
         responseLanguage: state.responseLanguage,
         background: state.background,
@@ -154,7 +155,7 @@ export const useAlishaStore = create<AlishaStore>()(
         permanentMemory: state.permanentMemory,
         voiceLanguage: state.voiceLanguage,
         voiceURI: state.voiceURI,
-        // Intentionally omit `conversation` so each page load starts fresh
+        conversation: state.conversation,
       }),
       migrate: (persisted: any, version: number) => {
         // v3 → v4 (and any future version): replace any deprecated model

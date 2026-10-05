@@ -4,6 +4,40 @@ export const runtime = 'nodejs';
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 /**
+ * Lightweight in-memory rate limiter.
+ *
+ * Each unique visitor (identified by client IP) is capped at
+ * RATE_LIMIT_PER_MINUTE requests. Once exceeded, the API responds with 429
+ * until the window slides. This protects the server-side API key from being
+ * abused by a single user flooding the endpoint.
+ *
+ * Note: this is per-instance state, so it resets on cold start. Acceptable
+ * for a hobby deployment; for production we'd want Upstash Redis.
+ */
+const RATE_LIMIT_PER_MINUTE = 60;
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || entry.resetAt < now) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > RATE_LIMIT_PER_MINUTE;
+}
+
+function getClientIp(request: NextRequest): string {
+  // Vercel sets x-forwarded-for; x-real-ip is also commonly set.
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip')?.trim() ||
+    'unknown'
+  );
+}
+
+/**
  * Resolve the API keys to use, in priority order.
  *
  * Order of precedence:
@@ -42,6 +76,14 @@ function resolveKeys(clientKey: string | undefined | null, keyChoice: string | u
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate-limit check (protects the server-side API key from abuse).
+    const clientIp = getClientIp(request);
+    if (isRateLimited(clientIp)) {
+      return NextResponse.json(
+        { error: { message: 'تم تجاوز عدد الطلبات المسموح. حاول بعد دقيقة.' } },
+        { status: 429 },
+      );
+    }
     const body = await request.json();
     const clientKey = typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
     const keyChoice = request.headers.get('x-gemini-key-choice')?.trim() || undefined;
@@ -164,6 +206,14 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  // Rate-limit check.
+  const clientIp = getClientIp(request);
+  if (isRateLimited(clientIp)) {
+    return NextResponse.json(
+      { error: { message: 'تم تجاوز عدد الطلبات المسموح. حاول بعد دقيقة.' } },
+      { status: 429 },
+    );
+  }
   const clientKey = request.headers.get('x-client-key')?.trim();
   const keyChoice = request.headers.get('x-gemini-key-choice')?.trim() || undefined;
   const apiKeys = resolveKeys(clientKey, keyChoice);
