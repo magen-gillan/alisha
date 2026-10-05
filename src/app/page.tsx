@@ -71,7 +71,7 @@ export default function Home() {
   const [speaking, setSpeaking] = useState(false);
   const [listening, setListening] = useState(false);
   const [thinking, setThinking] = useState(false);
-  const { background, responseLanguage } = useAlishaStore();
+  const { background, responseLanguage, avatarId } = useAlishaStore();
   const viewportHeight = useVisualViewportHeight();
 
   // Stop any speech when unmounting
@@ -154,6 +154,7 @@ export default function Home() {
                 speaking={speaking}
                 listening={listening}
                 thinking={thinking}
+                avatarId={avatarId}
               />
             </Suspense>
           </AlishaErrorBoundary>

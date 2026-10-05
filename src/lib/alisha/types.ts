@@ -7,6 +7,12 @@ export type ResponseLanguage = 'en' | 'ar' | 'ja';
 export type BackgroundId = 'aurora' | 'sunset' | 'midnight' | 'sakura';
 
 /**
+ * Which Live2D avatar to render. Multiple models can coexist in
+ * /public/live2d/. Switching is done at runtime in the settings panel.
+ */
+export type AvatarId = 'kei' | 'jane' | 'icegirl' | 'ganyu' | 'miara';
+
+/**
  * Which AI provider to use for text generation.
  * - `gemini`: Google Gemini via /api/gemini (default, original)
  * - `pollinations`: Pollinations.ai via /api/pollinations
@@ -37,6 +43,8 @@ export interface AlishaSettings {
   responseLanguage: ResponseLanguage;
   /** Currently selected background. */
   background: BackgroundId;
+  /** Selected Live2D avatar. */
+  avatarId: AvatarId;
   /** Selected Gemini model ID. */
   model: string;
   /** Selected Pollinations model ID (used when provider='pollinations'). */

@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AlishaSettings, ResponseLanguage, BackgroundId, AIProvider, GeminiKeyChoice } from '@/lib/alisha/types';
+import type { AlishaSettings, ResponseLanguage, BackgroundId, AIProvider, GeminiKeyChoice, AvatarId } from '@/lib/alisha/types';
 import { DEPRECATED_MODELS } from '@/lib/alisha/gemini-client';
 
 export interface ChatMessage {
@@ -29,6 +29,7 @@ interface AlishaStore extends AlishaSettings {
 
   setResponseLanguage: (lang: ResponseLanguage) => void;
   setBackground: (bg: BackgroundId) => void;
+  setAvatarId: (id: AvatarId) => void;
   setModel: (model: string) => void;
   setPollinationsModel: (model: string) => void;
   setProvider: (provider: AIProvider) => void;
@@ -70,6 +71,7 @@ const DEFAULTS: AlishaSettings & {
 } = {
   responseLanguage: 'ar',
   background: 'aurora',
+  avatarId: 'kei',
   // gemini-flash-latest is the only model that works for new Gemini API keys
   // (gemini-2.0-flash, gemini-1.5-flash, gemini-2.5-flash are all deprecated
   //  for new users as of 2026).
@@ -100,6 +102,7 @@ export const useAlishaStore = create<AlishaStore>()(
       ...DEFAULTS,
       setResponseLanguage: (lang) => set({ responseLanguage: lang }),
       setBackground: (bg) => set({ background: bg }),
+      setAvatarId: (id) => set({ avatarId: id }),
       setModel: (model) => set({ model }),
       setPollinationsModel: (model) => set({ pollinationsModel: model }),
       setProvider: (provider) => set({ provider }),
@@ -138,12 +141,13 @@ export const useAlishaStore = create<AlishaStore>()(
     }),
     {
       name: 'alisha-settings',
-      version: 8,
+      version: 9,
       // Persist conversation across reloads too — the user often wants to
       // continue where they left off after closing the tab.
       partialize: (state) => ({
         responseLanguage: state.responseLanguage,
         background: state.background,
+        avatarId: state.avatarId,
         model: state.model,
         pollinationsModel: state.pollinationsModel,
         provider: state.provider,
@@ -183,6 +187,12 @@ export const useAlishaStore = create<AlishaStore>()(
         if (typeof persisted.geminiKeyChoice !== 'string' ||
             !['auto', 'primary', 'legacy'].includes(persisted.geminiKeyChoice)) {
           persisted.geminiKeyChoice = 'auto';
+        }
+        // v8 → v9: add avatarId. Default to 'kei' for existing users so they
+        // don't see any visual change.
+        if (typeof persisted.avatarId !== 'string' ||
+            !['kei', 'jane', 'icegirl', 'ganyu', 'miara'].includes(persisted.avatarId)) {
+          persisted.avatarId = 'kei';
         }
         return persisted;
       },

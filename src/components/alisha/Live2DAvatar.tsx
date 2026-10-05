@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { BackgroundId } from '@/lib/alisha/types';
+import type { BackgroundId, AvatarId } from '@/lib/alisha/types';
+import { getAvatarById } from '@/lib/alisha/avatars';
 
 interface Live2DAvatarProps {
   background: BackgroundId;
   speaking: boolean;
   listening: boolean;
   thinking: boolean;
+  avatarId: AvatarId;
 }
 
 /**
@@ -42,6 +44,7 @@ export default function Live2DAvatar({
   speaking,
   listening,
   thinking,
+  avatarId,
 }: Live2DAvatarProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -66,7 +69,10 @@ export default function Live2DAvatar({
   }, [thinking]);
 
   // ---- Live2D init ----
+  // Re-init whenever the avatarId changes (so the user can switch avatars
+  // at runtime). The init function reads avatarId from the closure.
   useEffect(() => {
+    const avatar = getAvatarById(avatarId);
     let cancelled = false;
     let raf: number | null = null;
     let resizeObserver: ResizeObserver | null = null;
@@ -132,8 +138,8 @@ export default function Live2DAvatar({
         });
         pixiAppRef.current = app;
 
-        // 4) Load the Live2D model (Kei — official Live2D Cubism 4 sample)
-        const modelUrl = '/live2d/alisha/kei_basic_free.model3.json';
+        // 4) Load the Live2D model selected by the user.
+        const modelUrl = avatar.modelUrl;
         const model = await Live2DModel.from(modelUrl);
         if (cancelled) {
           try {
@@ -300,7 +306,7 @@ export default function Live2DAvatar({
       modelRef.current = null;
       pixiAppRef.current = null;
     };
-  }, []);
+  }, [avatarId]);
 
   // NOTE: Previously this effect called `modelRef.current.motion('Idle')`
   // every time listening/thinking toggled, which visibly restarted the idle

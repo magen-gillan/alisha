@@ -35,6 +35,7 @@ import type {
   BackgroundId,
   AIProvider,
   GeminiKeyChoice,
+  AvatarId,
 } from '@/lib/alisha/types';
 import {
   LANGUAGE_LABELS,
@@ -45,6 +46,7 @@ import {
   GEMINI_KEY_CHOICE_LABELS,
   GEMINI_KEY_CHOICE_DESCRIPTIONS,
 } from '@/lib/alisha/types';
+import { AVATAR_MODELS, getAvatarById } from '@/lib/alisha/avatars';
 import {
   listGeminiModels,
   setApiKey as persistApiKey,
@@ -111,6 +113,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
   const {
     responseLanguage,
     background,
+    avatarId,
     model,
     speechRate,
     speechPitch,
@@ -125,6 +128,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     conversation,
     setResponseLanguage,
     setBackground,
+    setAvatarId,
     setModel,
     setPollinationsModel,
     setProvider,
@@ -620,21 +624,35 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
               </AccordionTrigger>
               <AccordionContent className="space-y-3 pt-2">
                 <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    className="rounded-lg border-2 border-primary p-3 bg-muted/30 text-left"
-                  >
-                    <div className="text-sm font-medium">Kei</div>
-                    <div className="text-xs text-muted-foreground">مفعّل</div>
-                  </button>
-                  <button
-                    type="button"
-                    disabled
-                    className="rounded-lg border-2 border-muted p-3 text-left opacity-50 cursor-not-allowed"
-                  >
-                    <div className="text-sm font-medium">+ موديل جديد</div>
-                    <div className="text-xs text-muted-foreground">قريباً</div>
-                  </button>
+                  {AVATAR_MODELS.map((m) => {
+                    const isSelected = avatarId === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setAvatarId(m.id)}
+                        className={`rounded-lg border-2 p-3 text-left transition-all ${
+                          isSelected
+                            ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
+                            : 'border-white/10 bg-white/5 hover:border-muted-foreground/30'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">
+                            {m.emoji} {m.name}
+                          </span>
+                          {isSelected && (
+                            <CheckCircle2 className="w-4 h-4 text-primary" />
+                          )}
+                        </div>
+                        {m.description && (
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {m.description}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </AccordionContent>
             </AccordionItem>
