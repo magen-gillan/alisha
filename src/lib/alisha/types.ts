@@ -7,6 +7,13 @@ export type ResponseLanguage = 'en' | 'ar' | 'ja';
 export type BackgroundId = 'aurora' | 'sunset' | 'midnight' | 'sakura';
 
 /**
+ * App color theme.
+ *  - 'dark'  : default, deep purple backgrounds (original look)
+ *  - 'light' : brighter background tint, better for daytime use
+ */
+export type AppTheme = 'dark' | 'light';
+
+/**
  * Which Live2D avatar to render. Multiple models can coexist in
  * /public/live2d/. Switching is done at runtime in the settings panel.
  */
@@ -45,6 +52,8 @@ export interface AlishaSettings {
   background: BackgroundId;
   /** Selected Live2D avatar. */
   avatarId: AvatarId;
+  /** UI color theme. */
+  theme: AppTheme;
   /** Selected Gemini model ID. */
   model: string;
   /** Selected Pollinations model ID (used when provider='pollinations'). */
@@ -112,6 +121,19 @@ export const BACKGROUND_LABELS: Record<BackgroundId, string> = {
   midnight: 'سطح ضوء القمر',
   sakura: 'غرفة السحاب',
 };
+
+/** All background ids in display order. Used by swipe gesture to cycle. */
+export const BACKGROUND_ORDER: BackgroundId[] = ['aurora', 'sunset', 'midnight', 'sakura'];
+
+export function nextBackground(current: BackgroundId): BackgroundId {
+  const idx = BACKGROUND_ORDER.indexOf(current);
+  return BACKGROUND_ORDER[(idx + 1) % BACKGROUND_ORDER.length];
+}
+
+export function prevBackground(current: BackgroundId): BackgroundId {
+  const idx = BACKGROUND_ORDER.indexOf(current);
+  return BACKGROUND_ORDER[(idx - 1 + BACKGROUND_ORDER.length) % BACKGROUND_ORDER.length];
+}
 
 export const PROVIDER_LABELS: Record<AIProvider, string> = {
   gemini: 'Gemini',

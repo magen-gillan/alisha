@@ -48,11 +48,14 @@ export function trimConversationToTokens(
 /**
  * Build the history payload for the AI provider from the persisted
  * conversation. Trims to fit the token budget.
+ *
+ * Accepts either full ChatMessage objects (with id/ts/lang) or partial
+ * {role, text} objects — we only read role and text anyway.
  */
 export function buildHistory(
-  conversation: ChatMessage[],
+  messages: Array<{ role: 'user' | 'model'; text: string }>,
   budget: number = DEFAULT_TOKEN_BUDGET,
 ): { role: 'user' | 'model'; text: string }[] {
-  const trimmed = trimConversationToTokens(conversation, budget);
+  const trimmed = trimConversationToTokens(messages as ChatMessage[], budget);
   return trimmed.map((m) => ({ role: m.role, text: m.text }));
 }

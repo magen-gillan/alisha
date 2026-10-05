@@ -24,7 +24,7 @@ import type {
 } from './types';
 import { detectLanguage, systemInstructionFor } from './language';
 
-const API_BASE = '/api/pollinations';
+const API_BASE = '/api/pollinations/';
 
 const STORAGE_KEY = 'alisha-pollinations-api-key';
 
@@ -129,6 +129,10 @@ export async function chatWithPollinations(req: ChatRequest, apiKey?: string): P
   const key = apiKey || getPollinationsApiKey();
   if (!req.userInput?.trim()) {
     throw new Error('userInput is required.');
+  }
+  // Client-side length guard.
+  if (req.userInput.length > 8000) {
+    throw new Error('الرسالة طويلة جداً. الحد الأقصى 8000 حرف.');
   }
 
   const responseLanguage: ResponseLanguage = ['en', 'ar', 'ja'].includes(

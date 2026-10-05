@@ -21,6 +21,8 @@ export interface AvatarModel {
   description?: string;
   /** Optional emoji/character used as a tiny preview chip. */
   emoji?: string;
+  /** Optional thumbnail image URL (small preview shown in the picker). */
+  thumbnailUrl?: string;
 }
 
 export const AVATAR_MODELS: AvatarModel[] = [
@@ -30,6 +32,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     modelUrl: '/live2d/alisha/kei_basic_free.model3.json',
     description: 'Cubism 4 Sample',
     emoji: '👧',
+    thumbnailUrl: '/live2d/thumbnails/kei.png',
   },
   {
     id: 'jane',
@@ -37,6 +40,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     modelUrl: '/live2d/jane/jane.model3.json',
     description: 'Chinese-style avatar',
     emoji: '🧝',
+    thumbnailUrl: '/live2d/thumbnails/jane.png',
   },
   {
     id: 'icegirl',
@@ -44,6 +48,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     modelUrl: '/live2d/icegirl/IceGirl.model3.json',
     description: 'Ice-themed avatar',
     emoji: '❄️',
+    thumbnailUrl: '/live2d/thumbnails/icegirl.png',
   },
   {
     id: 'ganyu',
@@ -51,6 +56,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     modelUrl: '/live2d/ganyu/ganyu.model3.json',
     description: 'Genshin Impact style',
     emoji: '🐉',
+    thumbnailUrl: '/live2d/thumbnails/ganyu.png',
   },
   {
     id: 'miara',
@@ -58,6 +64,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     modelUrl: '/live2d/miara/miara_pro_t03.model3.json',
     description: 'Pro avatar with motions',
     emoji: '✨',
+    thumbnailUrl: '/live2d/thumbnails/miara.png',
   },
 ];
 

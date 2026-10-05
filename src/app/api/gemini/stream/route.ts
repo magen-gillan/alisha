@@ -32,8 +32,38 @@ function resolveKeys(clientKey: string, keyChoice: string | undefined | null): s
   return keys;
 }
 
+const RATE_LIMIT_PER_MINUTE = 60;
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || entry.resetAt < now) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > RATE_LIMIT_PER_MINUTE;
+}
+
+function getClientIp(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip')?.trim() ||
+    'unknown'
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // Rate-limit check (same as the non-stream route).
+    const clientIp = getClientIp(request);
+    if (isRateLimited(clientIp)) {
+      return NextResponse.json(
+        { error: { message: 'تم تجاوز عدد الطلبات المسموح. حاول بعد دقيقة.' } },
+        { status: 429 },
+      );
+    }
     const body = await request.json();
     const clientKey = typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
     const keyChoice = request.headers.get('x-gemini-key-choice')?.trim() || undefined;
@@ -69,7 +99,8 @@ export async function POST(request: NextRequest) {
         upstream = r;
         break;
       }
-      if (r.status === 400 || r.status === 401 || r.status === 403 || r.status === 429) {
+      // 400/401/403/429/503 → key-specific or transient; try next key if available.
+      if ([400, 401, 403, 429, 503].includes(r.status)) {
         continue;
       }
       upstream = r;

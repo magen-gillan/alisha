@@ -19,7 +19,7 @@ import type {
 } from './types';
 import { detectLanguage, systemInstructionFor } from './language';
 
-const API_BASE = '/api/gemini';
+const API_BASE = '/api/gemini/';
 
 export function getApiKey(): string {
   // 1. User-set key (overrides the encrypted Vercel server key)
@@ -156,6 +156,10 @@ export async function chatWithGemini(
   const key = apiKey || getApiKey();
   if (!req.userInput?.trim()) {
     throw new Error('userInput is required.');
+  }
+  // Client-side length guard: protects the server from oversized payloads.
+  if (req.userInput.length > 8000) {
+    throw new Error('الرسالة طويلة جداً. الحد الأقصى 8000 حرف.');
   }
 
   const responseLanguage: ResponseLanguage = ['en', 'ar', 'ja'].includes(

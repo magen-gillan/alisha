@@ -150,8 +150,10 @@ export default function VoiceChatButton({
         responseLanguage,
         // Pick the right model id for whichever provider is active
         model: provider === 'pollinations' ? pollinationsModel : model,
-        // Token-aware trimming: don't send the entire history if it's huge.
-        history: buildHistory(conversation),
+        // Use historyRef.current (always up-to-date) instead of the captured
+        // `conversation` closure, so messages added while the mic is open
+        // are properly included.
+        history: buildHistory(historyRef.current),
         permanentMemory,
         signal: controller.signal,
       };

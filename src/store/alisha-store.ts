@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AlishaSettings, ResponseLanguage, BackgroundId, AIProvider, GeminiKeyChoice, AvatarId } from '@/lib/alisha/types';
+import type { AlishaSettings, ResponseLanguage, BackgroundId, AIProvider, GeminiKeyChoice, AvatarId, AppTheme } from '@/lib/alisha/types';
 import { DEPRECATED_MODELS } from '@/lib/alisha/gemini-client';
 
 export interface ChatMessage {
@@ -30,6 +30,7 @@ interface AlishaStore extends AlishaSettings {
   setResponseLanguage: (lang: ResponseLanguage) => void;
   setBackground: (bg: BackgroundId) => void;
   setAvatarId: (id: AvatarId) => void;
+  setTheme: (theme: AppTheme) => void;
   setModel: (model: string) => void;
   setPollinationsModel: (model: string) => void;
   setProvider: (provider: AIProvider) => void;
@@ -72,6 +73,7 @@ const DEFAULTS: AlishaSettings & {
   responseLanguage: 'ar',
   background: 'aurora',
   avatarId: 'kei',
+  theme: 'dark',
   // gemini-flash-latest is the only model that works for new Gemini API keys
   // (gemini-2.0-flash, gemini-1.5-flash, gemini-2.5-flash are all deprecated
   //  for new users as of 2026).
@@ -103,6 +105,7 @@ export const useAlishaStore = create<AlishaStore>()(
       setResponseLanguage: (lang) => set({ responseLanguage: lang }),
       setBackground: (bg) => set({ background: bg }),
       setAvatarId: (id) => set({ avatarId: id }),
+      setTheme: (theme) => set({ theme }),
       setModel: (model) => set({ model }),
       setPollinationsModel: (model) => set({ pollinationsModel: model }),
       setProvider: (provider) => set({ provider }),
@@ -141,13 +144,14 @@ export const useAlishaStore = create<AlishaStore>()(
     }),
     {
       name: 'alisha-settings',
-      version: 9,
+      version: 10,
       // Persist conversation across reloads too — the user often wants to
       // continue where they left off after closing the tab.
       partialize: (state) => ({
         responseLanguage: state.responseLanguage,
         background: state.background,
         avatarId: state.avatarId,
+        theme: state.theme,
         model: state.model,
         pollinationsModel: state.pollinationsModel,
         provider: state.provider,
@@ -193,6 +197,11 @@ export const useAlishaStore = create<AlishaStore>()(
         if (typeof persisted.avatarId !== 'string' ||
             !['kei', 'jane', 'icegirl', 'ganyu', 'miara'].includes(persisted.avatarId)) {
           persisted.avatarId = 'kei';
+        }
+        // v9 → v10: add app theme (default 'dark' to preserve look).
+        if (typeof persisted.theme !== 'string' ||
+            !['dark', 'light'].includes(persisted.theme)) {
+          persisted.theme = 'dark';
         }
         return persisted;
       },

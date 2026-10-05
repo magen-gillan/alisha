@@ -119,7 +119,9 @@ export async function POST(request: NextRequest) {
     const isKeySpecificError = (status: number, data: any): boolean => {
       // 400 / 401 / 403 = auth, permission, or unsupported-location errors.
       // 429 = rate limited on this key (trying the next one may help).
-      if (status === 400 || status === 401 || status === 403 || status === 429) return true;
+      // 503 = transient Gemini backend error; the legacy key might be served
+      //       by a different backend, so it's worth trying too.
+      if (status === 400 || status === 401 || status === 403 || status === 429 || status === 503) return true;
       // Gemini sometimes returns 200 with an "API_KEY_SERVICE_BLOCKED" style error.
       const msg: string = String(data?.error?.message || '').toLowerCase();
       if (msg.includes('api_key_service_blocked')) return true;
@@ -189,7 +191,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Loop completed without returning — return whatever we last got.
-    console.warn(`[gemini] All ${apiKeys.length} keys exhausted; last used key suffix=...${lastKeyUsed.slice(-6)}`);
+    // Don't log any key material (even the suffix) to server logs.
+    console.warn(`[gemini] All ${apiKeys.length} keys exhausted`);
     return NextResponse.json(
       data || { error: { message: 'تعذر الاتصال بخدمة Gemini.' } },
       { status: response?.status || 500 },

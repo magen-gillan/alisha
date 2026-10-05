@@ -237,3 +237,20 @@ button, [role="button"] { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   .animate-eq { animation: none; height: 50% !important; opacity: 0.6 !important; }
 }
+
+
+/* ===== Light theme overrides =====
+   Applied when <html> has class "theme-light".
+   Keeps the dark background images but lifts the foreground tint so the
+   avatar + text are easier to read in bright environments. */
+html.theme-light body {
+  background-color: #efe9f7;
+}
+html.theme-light .bg-background { background-color: #efe9f7 !important; }
+html.theme-light .text-foreground { color: #1a1330 !important; }
+html.theme-light header span { color: #1a1330 !important; }
+html.theme-light header button { color: #1a1330 !important; }
+html.theme-light header button:hover { background-color: rgba(0,0,0,0.08) !important; }
+/* The header text shadow that helps readability on dark backgrounds is
+   counterproductive on light backgrounds — drop it. */
+html.theme-light header .drop-shadow { filter: none !important; }

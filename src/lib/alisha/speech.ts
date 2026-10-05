@@ -146,12 +146,16 @@ export function loadVoices(): Promise<SpeechSynthesisVoice[]> {
       cachedVoices = existing;
       return resolve(existing);
     }
+    // Use addEventListener + { once: true } instead of overwriting
+    // `onvoiceschanged`, which previously leaked handlers across concurrent
+    // callers (VoiceChatButton, TextChatButton, SettingsPanel all call
+    // loadVoices on mount).
     const handler = () => {
       const v = window.speechSynthesis.getVoices();
       cachedVoices = v;
       resolve(v);
     };
-    window.speechSynthesis.onvoiceschanged = handler;
+    window.speechSynthesis.addEventListener('voiceschanged', handler, { once: true });
     // Fallback in case the event never fires
     setTimeout(() => {
       const voices = window.speechSynthesis.getVoices();

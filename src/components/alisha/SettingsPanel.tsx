@@ -631,25 +631,38 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                         key={m.id}
                         type="button"
                         onClick={() => setAvatarId(m.id)}
-                        className={`rounded-lg border-2 p-3 text-left transition-all ${
+                        className={`group relative overflow-hidden rounded-lg border-2 p-0 text-left transition-all ${
                           isSelected
-                            ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
-                            : 'border-white/10 bg-white/5 hover:border-muted-foreground/30'
+                            ? 'border-primary ring-2 ring-primary/30'
+                            : 'border-white/10 hover:border-muted-foreground/30'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">
-                            {m.emoji} {m.name}
-                          </span>
-                          {isSelected && (
-                            <CheckCircle2 className="w-4 h-4 text-primary" />
-                          )}
-                        </div>
-                        {m.description && (
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            {m.description}
+                        {/* Thumbnail preview */}
+                        {m.thumbnailUrl ? (
+                          <div className="aspect-square w-full bg-black/30 overflow-hidden">
+                            <img
+                              src={m.thumbnailUrl}
+                              alt={m.name}
+                              loading="lazy"
+                              className="h-full w-full object-cover object-top transition-transform group-hover:scale-105"
+                            />
+                          </div>
+                        ) : (
+                          <div className="aspect-square w-full bg-muted/30 flex items-center justify-center text-3xl">
+                            {m.emoji}
                           </div>
                         )}
+                        {/* Name + checkmark */}
+                        <div className="px-2 py-1.5 bg-black/40 backdrop-blur-sm">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-xs font-semibold text-white truncate">
+                              {m.name}
+                            </span>
+                            {isSelected && (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                            )}
+                          </div>
+                        </div>
                       </button>
                     );
                   })}

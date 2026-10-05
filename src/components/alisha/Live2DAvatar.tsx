@@ -315,11 +315,49 @@ export default function Live2DAvatar({
   // don't need to re-trigger motions here. State changes are reflected
   // through the speakingRef/listeningRef/thinkingRef refs that the loop reads.
 
+  /**
+   * Tap the avatar to trigger a random expression (if the loaded model
+   * has any expression files). Falls back to the 'TapBody' motion group
+   * for models that have it (Kei, Miara).
+   */
+  const handleTap = () => {
+    if (loadState !== 'ready' || !modelRef.current) return;
+    try {
+      const internal = modelRef.current.internalModel;
+      // Some models expose expressions via the .model3.json FileReferences.
+      // pixi-live2d-display auto-loads them and exposes them as
+      // `model.internalModel.motion` and `model.expression`.
+      // We try expression first, then motion('TapBody').
+      const tryExpression = (modelRef.current as any).expression;
+      if (typeof tryExpression === 'function') {
+        // Pick a random expression index (capped to avoid OOB).
+        const n = internal?.settings?.expressions?.length || 0;
+        if (n > 0) {
+          tryExpression(Math.floor(Math.random() * n));
+          return;
+        }
+      }
+      // Fallback: trigger TapBody motion group (Kei has it).
+      modelRef.current.motion('TapBody');
+    } catch {
+      /* noop */
+    }
+  };
+
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full flex items-center justify-center overflow-hidden"
+      onClick={handleTap}
+      className="relative w-full h-full flex items-center justify-center overflow-hidden cursor-pointer"
       aria-label="Alisha avatar"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleTap();
+        }
+      }}
     >
       {/* Live2D canvas — fills container */}
       <canvas
