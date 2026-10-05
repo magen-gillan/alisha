@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Keyboard, Loader2, Send, X } from 'lucide-react';
+import { Keyboard, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAlishaStore } from '@/store/alisha-store';
 import {
@@ -174,23 +173,28 @@ export default function TextChatButton({
   return (
     <>
       {/* Trigger button */}
-      <Button
+      <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        size="lg"
-        className={`rounded-full w-16 h-16 sm:w-20 sm:h-20 shadow-xl transition-all duration-300 ${
-          open
-            ? 'bg-rose-500 hover:bg-rose-600'
-            : 'bg-gradient-to-br from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700'
-        }`}
         aria-label={open ? 'Close text input' : 'Type a message'}
+        className={`group relative inline-flex items-center justify-center rounded-full w-16 h-16 sm:w-20 sm:h-20 shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
+          open
+            ? 'bg-rose-500 hover:bg-rose-400 shadow-rose-500/60 shadow-[0_0_35px_rgba(244,63,94,0.6)]'
+            : 'bg-gradient-to-br from-indigo-500 to-blue-600 hover:from-indigo-400 hover:to-blue-500 hover:shadow-[0_0_35px_rgba(99,102,241,0.6)] shadow-indigo-900/30'
+        }`}
       >
-        {open ? (
-          <X className="w-7 h-7 text-white" />
-        ) : (
-          <Keyboard className="w-7 h-7 text-white" />
+        {/* Gradient ring on hover */}
+        {!open && (
+          <span className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400 to-blue-500 opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-60" />
         )}
-      </Button>
+        <span className="relative z-10">
+          {open ? (
+            <X className="w-7 h-7 text-white" />
+          ) : (
+            <Keyboard className="w-7 h-7 text-white transition-transform duration-300 group-hover:scale-110" />
+          )}
+        </span>
+      </button>
 
       {/* Bottom-docked input panel — appears above the buttons.
           Positioned using fixed bottom offset so it stays visible above
@@ -220,20 +224,25 @@ export default function TextChatButton({
                   }
                 }}
               />
-              <Button
+              <button
                 type="button"
                 onClick={thinking ? handleCancel : handleSubmit}
                 disabled={thinking ? false : !input.trim()}
-                size="icon"
-                className="rounded-full w-11 h-11 bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 shrink-0"
                 aria-label={thinking ? 'Cancel response' : 'Send'}
+                className={`group relative inline-flex items-center justify-center rounded-full w-11 h-11 shrink-0 transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 disabled:opacity-40 disabled:hover:scale-100 ${
+                  thinking
+                    ? 'bg-rose-500 hover:bg-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.6)]'
+                    : 'bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 hover:shadow-[0_0_20px_rgba(217,70,239,0.6)]'
+                }`}
               >
-                {thinking ? (
-                  <X className="w-5 h-5 text-white" />
-                ) : (
-                  <Send className="w-5 h-5 text-white" />
-                )}
-              </Button>
+                <span className="relative z-10">
+                  {thinking ? (
+                    <X className="w-5 h-5 text-white" />
+                  ) : (
+                    <Send className="w-5 h-5 text-white transition-transform duration-300 group-hover:scale-110 group-hover:translate-x-0.5" />
+                  )}
+                </span>
+              </button>
             </div>
           </div>
         </div>

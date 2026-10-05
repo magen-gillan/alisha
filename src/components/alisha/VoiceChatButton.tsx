@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Mic, Square, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAlishaStore } from '@/store/alisha-store';
@@ -207,20 +206,10 @@ export default function VoiceChatButton({
   const isBusy = state !== 'idle';
 
   return (
-    <Button
+    <button
       type="button"
       onClick={handleClick}
       disabled={false}
-      size="lg"
-      className={`relative rounded-full w-20 h-20 sm:w-24 sm:h-24 shadow-xl transition-all duration-300 ${
-        state === 'listening'
-          ? 'bg-rose-500 hover:bg-rose-600 animate-pulse'
-          : state === 'speaking'
-          ? 'bg-purple-500 hover:bg-purple-600'
-          : state === 'thinking'
-          ? 'bg-blue-500 hover:bg-blue-600'
-          : 'bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700'
-      }`}
       aria-label={
         state === 'listening'
           ? 'Stop listening'
@@ -228,18 +217,51 @@ export default function VoiceChatButton({
           ? 'Stop speaking'
           : 'Start voice conversation'
       }
+      className={`group relative inline-flex items-center justify-center rounded-full w-20 h-20 sm:w-24 sm:h-24 shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
+        state === 'listening'
+          ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/60 shadow-[0_0_45px_rgba(244,63,94,0.7)] animate-pulse'
+          : state === 'speaking'
+          ? 'bg-purple-500 hover:bg-purple-600 shadow-purple-500/60 shadow-[0_0_45px_rgba(168,85,247,0.7)]'
+          : state === 'thinking'
+          ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/60 shadow-[0_0_45px_rgba(59,130,246,0.7)]'
+          : 'bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 hover:shadow-[0_0_45px_rgba(217,70,239,0.7)] shadow-fuchsia-900/30'
+      }`}
     >
-      {state === 'thinking' ? (
-        <Loader2 className="w-8 h-8 text-white animate-spin" />
-      ) : isBusy ? (
-        <Square className="w-7 h-7 text-white fill-white" />
-      ) : (
-        <Mic className="w-8 h-8 text-white" />
+      {/* Gradient ring on hover (idle state only) */}
+      {state === 'idle' && (
+        <span className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-60" />
       )}
-      {/* Pulsing ring when listening */}
+      {/* Inner content */}
+      <span className="relative z-10">
+        {state === 'thinking' ? (
+          <Loader2 className="w-8 h-8 text-white animate-spin" />
+        ) : isBusy ? (
+          <Square className="w-7 h-7 text-white fill-white" />
+        ) : (
+          <Mic className="w-8 h-8 text-white transition-transform duration-300 group-hover:scale-110" />
+        )}
+      </span>
+      {/* Pulsing rings when listening */}
       {state === 'listening' && (
-        <span className="absolute inset-0 rounded-full border-2 border-rose-300 animate-ping opacity-75" />
+        <>
+          <span className="absolute inset-0 rounded-full border-2 border-rose-300 animate-ping opacity-75" />
+          <span className="absolute -inset-2 rounded-full border border-rose-300/40 animate-pulse" />
+        </>
       )}
-    </Button>
+      {/* Speaking ripple */}
+      {state === 'speaking' && (
+        <span className="absolute -inset-2 rounded-full border border-purple-300/40 animate-pulse" />
+      )}
+
+      <span className="sr-only">
+        {state === 'listening'
+          ? 'Listening — tap to stop'
+          : state === 'speaking'
+          ? 'Speaking — tap to stop'
+          : state === 'thinking'
+          ? 'Alisha is thinking…'
+          : 'Tap to start voice conversation'}
+      </span>
+    </button>
   );
 }

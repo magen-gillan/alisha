@@ -254,3 +254,50 @@ html.theme-light header button:hover { background-color: rgba(0,0,0,0.08) !impor
 /* The header text shadow that helps readability on dark backgrounds is
    counterproductive on light backgrounds — drop it. */
 html.theme-light header .drop-shadow { filter: none !important; }
+
+
+/* ===== Premium button animations (Uiverse-inspired) ===== */
+
+/* Smooth scale + glow for all interactive buttons */
+button:focus-visible {
+  outline-offset: 2px;
+}
+
+/* Active press feedback */
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Glow pulse keyframe for the dark/light theme toggle knob */
+@keyframes alisha-theme-knob-glow {
+  0%, 100% { box-shadow: 0 0 12px currentColor; }
+  50% { box-shadow: 0 0 20px currentColor; }
+}
+
+/* Sparkle twinkle for dark theme stars */
+@keyframes alisha-twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* Close button subtle pulse to draw attention on first open */
+@keyframes alisha-close-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+.alisha-close-btn {
+  animation: alisha-close-pulse 2.4s ease-out 0s 2;
+}
+
+/* Avatar tap ripple */
+@keyframes alisha-tap-ripple {
+  0% { transform: scale(0.8); opacity: 0.8; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+/* Reduced motion — disable all the above */
+@media (prefers-reduced-motion: reduce) {
+  .alisha-close-btn { animation: none !important; }
+  button:active:not(:disabled) { transform: none !important; }
+  * { transition-duration: 0.01ms !important; }
+}

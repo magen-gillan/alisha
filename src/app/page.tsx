@@ -8,11 +8,12 @@ import SettingsPanel from '@/components/alisha/SettingsPanel';
 import StatusBar from '@/components/alisha/StatusBar';
 import AlishaErrorBoundary from '@/components/alisha/AlishaErrorBoundary';
 import { Button } from '@/components/ui/button';
-import { Settings, Loader2, Moon, Sun } from 'lucide-react';
+import { Settings, Loader2 } from 'lucide-react';
 import { useAlishaStore } from '@/store/alisha-store';
 import { stopSpeaking } from '@/lib/alisha/speech';
 import { useTouchGestures } from '@/hooks/use-touch-gestures';
 import { nextBackground, prevBackground } from '@/lib/alisha/types';
+import ThemeToggle from '@/components/alisha/ThemeToggle';
 
 // Lazy-load Live2DAvatar so pixi.js + pixi-live2d-display (combined ~600KB)
 // don't ship in the initial bundle. They're loaded on demand when the
@@ -161,16 +162,8 @@ export default function Home() {
           </span>
         </div>
 
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="text-white hover:bg-white/10"
-            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-          >
-            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </Button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle theme={theme} onToggle={setTheme} />
           <Button
             variant="ghost"
             size="icon"

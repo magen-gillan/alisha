@@ -58,6 +58,7 @@ import {
   isUsingBakedPollinationsKey,
 } from '@/lib/alisha/pollinations-client';
 import { shareOrDownload } from '@/lib/alisha/share';
+import CloseButton from '@/components/alisha/CloseButton';
 import {
   loadVoices,
   getVoicesForLanguage,
@@ -322,14 +323,11 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
         <SheetHeader className="border-b border-white/10 bg-gradient-to-br from-fuchsia-500/20 via-violet-500/10 to-transparent px-5 pb-4 pt-6 relative">
           <SheetTitle className="text-2xl font-bold tracking-tight text-white">Alisha Settings</SheetTitle>
           <SheetDescription className="sr-only">Alisha settings panel</SheetDescription>
-          <button
-            type="button"
+          <CloseButton
             onClick={() => onOpenChange(false)}
-            className="absolute top-3 left-3 z-30 inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-black hover:bg-red-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 shadow-lg"
-            aria-label="Close settings"
-          >
-            <X className="h-5 w-5 font-bold" strokeWidth={3} />
-          </button>
+            ariaLabel="Close settings"
+            className="absolute top-3 left-3 z-30"
+          />
         </SheetHeader>
 
         <ScrollArea className="flex-1 px-5 pb-5">
