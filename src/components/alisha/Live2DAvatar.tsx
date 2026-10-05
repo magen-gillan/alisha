@@ -302,19 +302,12 @@ export default function Live2DAvatar({
     };
   }, []);
 
-  // Trigger motions when state changes
-  useEffect(() => {
-    if (loadState !== 'ready' || !modelRef.current) return;
-    try {
-      if (speaking) {
-        // motion handled by animation loop (mouth)
-      } else if (listening) {
-        modelRef.current.motion('Idle');
-      } else if (thinking) {
-        modelRef.current.motion('Idle');
-      }
-    } catch {}
-  }, [speaking, listening, thinking, loadState]);
+  // NOTE: Previously this effect called `modelRef.current.motion('Idle')`
+  // every time listening/thinking toggled, which visibly restarted the idle
+  // animation and caused a stutter. The animation loop (requestAnimationFrame
+  // in the init effect) already drives the mouth / eyes continuously, so we
+  // don't need to re-trigger motions here. State changes are reflected
+  // through the speakingRef/listeningRef/thinkingRef refs that the loop reads.
 
   return (
     <div

@@ -17,6 +17,7 @@ import {
 import { detectLanguage } from '@/lib/alisha/language';
 import { chatWithGemini } from '@/lib/alisha/gemini-client';
 import { chatWithPollinations } from '@/lib/alisha/pollinations-client';
+import { buildHistory } from '@/lib/alisha/context-window';
 
 interface VoiceChatButtonProps {
   onSpeakingChange: (speaking: boolean) => void;
@@ -149,7 +150,8 @@ export default function VoiceChatButton({
         responseLanguage,
         // Pick the right model id for whichever provider is active
         model: provider === 'pollinations' ? pollinationsModel : model,
-        history: historyRef.current,
+        // Token-aware trimming: don't send the entire history if it's huge.
+        history: buildHistory(conversation),
         permanentMemory,
         signal: controller.signal,
       };
@@ -189,8 +191,9 @@ export default function VoiceChatButton({
       });
     } catch (err: any) {
       if (err?.name === 'AbortError' || requestId !== requestIdRef.current) return;
-      console.error('[VoiceChat] Gemini error:', err);
-      toast.error(err?.message || 'Failed to get a response from Gemini.');
+      console.error(`[VoiceChat] ${provider} error:`, err);
+      const providerLabel = provider === 'pollinations' ? 'Pollinations' : 'Gemini';
+      toast.error(err?.message || `Failed to get a response from ${providerLabel}.`);
       setState('idle');
       onThinkingChange(false);
       onSpeakingChange(false);

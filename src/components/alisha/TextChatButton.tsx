@@ -15,6 +15,7 @@ import {
 import { detectLanguage } from '@/lib/alisha/language';
 import { chatWithGemini } from '@/lib/alisha/gemini-client';
 import { chatWithPollinations } from '@/lib/alisha/pollinations-client';
+import { buildHistory } from '@/lib/alisha/context-window';
 
 interface TextChatButtonProps {
   onSpeakingChange: (speaking: boolean) => void;
@@ -31,6 +32,8 @@ export default function TextChatButton({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  // Track the most recent submitted text so handleCancel can restore it.
+  const lastSubmittedTextRef = useRef<string>('');
   const {
     responseLanguage,
     model,
@@ -74,6 +77,7 @@ export default function TextChatButton({
     const requestId = ++requestIdRef.current;
     const controller = new AbortController();
     abortRef.current = controller;
+    lastSubmittedTextRef.current = text;
     setInput('');
     setThinking(true);
     addMessage({ role: 'user', text, lang: detectLanguage(text) });
@@ -90,7 +94,7 @@ export default function TextChatButton({
         detectedLanguage: detected,
         responseLanguage,
         model: provider === 'pollinations' ? pollinationsModel : model,
-        history: historyRef.current,
+        history: buildHistory(conversation),
         permanentMemory,
         signal: controller.signal,
       };
@@ -132,8 +136,9 @@ export default function TextChatButton({
       if (err?.name === 'AbortError' || requestId !== requestIdRef.current) return;
       setInput(text);
       removeLastUserMessage(text);
-      console.error('[TextChat] Gemini error:', err);
-      toast.error(err?.message || 'Failed to get a response from Gemini.');
+      console.error(`[TextChat] ${provider} error:`, err);
+      const providerLabel = provider === 'pollinations' ? 'Pollinations' : 'Gemini';
+      toast.error(err?.message || `Failed to get a response from ${providerLabel}.`);
       setThinking(false);
       onThinkingChange(false);
       onSpeakingChange(false);
@@ -150,6 +155,12 @@ export default function TextChatButton({
     setThinking(false);
     onThinkingChange(false);
     onSpeakingChange(false);
+    // Restore the in-flight text so the user doesn't lose what they typed.
+    const lastUserMsg = lastSubmittedTextRef.current;
+    if (lastUserMsg) {
+      setInput(lastUserMsg);
+      lastSubmittedTextRef.current = '';
+    }
     toast('تم إيقاف الرد');
   };
 

@@ -1,16 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Live2DAvatar from '@/components/alisha/Live2DAvatar';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import BackgroundLayer from '@/components/alisha/BackgroundLayer';
 import VoiceChatButton from '@/components/alisha/VoiceChatButton';
 import TextChatButton from '@/components/alisha/TextChatButton';
 import SettingsPanel from '@/components/alisha/SettingsPanel';
 import StatusBar from '@/components/alisha/StatusBar';
+import AlishaErrorBoundary from '@/components/alisha/AlishaErrorBoundary';
 import { Button } from '@/components/ui/button';
-import { Settings } from 'lucide-react';
+import { Settings, Loader2 } from 'lucide-react';
 import { useAlishaStore } from '@/store/alisha-store';
 import { stopSpeaking } from '@/lib/alisha/speech';
+
+// Lazy-load Live2DAvatar so pixi.js + pixi-live2d-display (combined ~600KB)
+// don't ship in the initial bundle. They're loaded on demand when the
+// avatar section actually renders.
+const Live2DAvatar = lazy(() => import('@/components/alisha/Live2DAvatar'));
+
+function AvatarFallback() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-fuchsia-400/60" />
+    </div>
+  );
+}
 
 /**
  * Hook: useVisualViewportHeight
@@ -73,6 +86,30 @@ export default function Home() {
     document.documentElement.dir = responseLanguage === 'ar' ? 'rtl' : 'ltr';
   }, [responseLanguage]);
 
+  // Global keyboard shortcuts:
+  //   Ctrl/Cmd + ,  → open settings (matches most apps)
+  //   Ctrl/Cmd + /  → toggle text input (not implemented — focus instead)
+  //   Esc           → close settings (handled by Sheet)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const isMod = e.ctrlKey || e.metaKey;
+      // Ctrl/Cmd + , → open settings
+      if (isMod && e.key === ',') {
+        e.preventDefault();
+        setSettingsOpen(true);
+        return;
+      }
+      // Ctrl/Cmd + Enter → close settings (if open) and start a new chat
+      if (isMod && e.key === 'Enter') {
+        e.preventDefault();
+        setSettingsOpen(false);
+        return;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <main
       className="relative w-full overflow-hidden flex flex-col"
@@ -110,12 +147,32 @@ export default function Home() {
       {/* Avatar area — flex-1 takes remaining space, centers avatar */}
       <section className="relative z-10 flex-1 flex items-center justify-center px-2 min-h-0 overflow-hidden pb-2">
         <div className="relative w-full h-full max-w-[min(88vw,28rem)] max-h-[min(62vh,34rem)] mx-auto flex items-center justify-center">
-          <Live2DAvatar
-            background={background}
-            speaking={speaking}
-            listening={listening}
-            thinking={thinking}
-          />
+          <AlishaErrorBoundary label="Avatar">
+            <Suspense fallback={<AvatarFallback />}>
+              <Live2DAvatar
+                background={background}
+                speaking={speaking}
+                listening={listening}
+                thinking={thinking}
+              />
+            </Suspense>
+          </AlishaErrorBoundary>
+          {/* Audio visualization overlay when Alisha is speaking */}
+          {speaking && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-2 flex items-end justify-center gap-1 h-10 z-20" aria-hidden="true">
+              {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                <span
+                  key={i}
+                  className="w-1 bg-fuchsia-400/70 rounded-full animate-eq"
+                  style={{
+                    height: '30%',
+                    animationDelay: `${i * 80}ms`,
+                    animationDuration: `${600 + (i % 3) * 120}ms`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -148,7 +205,9 @@ export default function Home() {
         </div>
       </footer>
 
-      <SettingsPanel open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <AlishaErrorBoundary label="Settings">
+        <SettingsPanel open={settingsOpen} onOpenChange={setSettingsOpen} />
+      </AlishaErrorBoundary>
     </main>
   );
 }

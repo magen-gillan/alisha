@@ -55,6 +55,7 @@ import {
   setPollinationsApiKey as persistPollinationsApiKey,
   isUsingBakedPollinationsKey,
 } from '@/lib/alisha/pollinations-client';
+import { shareOrDownload } from '@/lib/alisha/share';
 import {
   loadVoices,
   getVoicesForLanguage,
@@ -79,6 +80,7 @@ import {
   CheckCircle2,
   Save,
   X,
+  Share2,
 } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -834,27 +836,40 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                 </span>
               </AccordionTrigger>
               <AccordionContent className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">
                     {conversation.length === 0
                       ? 'لا توجد رسائل بعد.'
-                      : `${conversation.length} رسالة في هذه الجلسة`}
+                      : `${conversation.length} رسالة`}
                   </p>
-                  {conversation.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm('مسح كل رسائل هذه الجلسة؟')) {
-                          clearConversation();
-                        }
-                      }}
-                      className="h-7 text-xs text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="w-3 h-3 mr-1" />
-                      مسح
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {conversation.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void shareOrDownload(conversation, responseLanguage)}
+                        className="h-7 text-xs"
+                      >
+                        <Share2 className="w-3 h-3 mr-1" />
+                        مشاركة
+                      </Button>
+                    )}
+                    {conversation.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm('مسح كل الرسائل؟')) {
+                            clearConversation();
+                          }
+                        }}
+                        className="h-7 text-xs text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        مسح
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="max-h-72 overflow-y-auto rounded-md border bg-muted/30 p-2 space-y-2">
                   {conversation.length === 0 ? (
