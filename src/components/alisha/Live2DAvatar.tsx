@@ -160,23 +160,41 @@ function AvatarInstance({
         pixiAppRef.current = app;
 
         // 4) Load the Live2D model.
-        //    Wrap in a try/catch with a clearer error message so the user
-        //    knows if their MOC3 version is unsupported by Cubism Core.
+        //    Some models are large (Jane's texture is 6MB) so we set a long
+        //    timeout via AbortController. pixi-live2d-display doesn't expose
+        //    a timeout option, but we wrap it with Promise.race to bail out
+        //    after 30s.
         const modelUrl = avatar.modelUrl;
         let model: any;
+        const loadTimeoutMs = 30_000;
         try {
-          model = await Live2DModel.from(modelUrl, {
-            // Pass an error handler so we can surface MOC3 version issues.
+          const loadPromise = Live2DModel.from(modelUrl, {
             onError: (err: any) => {
               console.error('[Live2DAvatar] model load error:', err);
             },
           });
+          // Race against a timeout — if loading takes too long, throw a
+          // clearer error than the default "Network error".
+          model = await Promise.race([
+            loadPromise,
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error(`Model load timed out after ${loadTimeoutMs / 1000}s — check your network connection.`)),
+                loadTimeoutMs
+              )
+            ),
+          ]);
         } catch (modelErr: any) {
           const msg = String(modelErr?.message || '').toLowerCase();
           if (msg.includes('moc') || msg.includes('version') || msg.includes('inconsistent')) {
             throw new Error(
-              'This avatar uses a newer MOC3 format (v5) that the bundled Cubism Core (2019) cannot read. ' +
-              'Please use Kei, IceGirl, Gan Yu, or Miara — they use MOC3 v3/v4 which is supported.'
+              'This avatar uses a MOC3 format that the bundled Cubism Core cannot read.'
+            );
+          }
+          if (msg.includes('network') || msg.includes('timed out') || msg.includes('timeout')) {
+            throw new Error(
+              `Network error loading avatar. The model files are large (up to 6MB). ` +
+              `Please check your connection and try again.`
             );
           }
           throw modelErr;
