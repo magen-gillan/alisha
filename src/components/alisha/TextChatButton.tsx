@@ -15,15 +15,18 @@ import { detectLanguage } from '@/lib/alisha/language';
 import { chatWithGemini } from '@/lib/alisha/gemini-client';
 import { chatWithPollinations } from '@/lib/alisha/pollinations-client';
 import { buildHistory } from '@/lib/alisha/context-window';
+import { detectEmotion, type Emotion } from '@/lib/alisha/emotion';
 
 interface TextChatButtonProps {
   onSpeakingChange: (speaking: boolean) => void;
   onThinkingChange: (thinking: boolean) => void;
+  setEmotionRef?: React.MutableRefObject<((emotion: Emotion) => void) | null>;
 }
 
 export default function TextChatButton({
   onSpeakingChange,
   onThinkingChange,
+  setEmotionRef,
 }: TextChatButtonProps) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
@@ -105,6 +108,13 @@ export default function TextChatButton({
 
       // Add only the model response; the user message was saved before the request.
       addMessage({ role: 'model', text: chat.text, lang: responseLanguage });
+
+      // Detect emotion from the AI response and apply to avatar
+      const emotion = detectEmotion(chat.text);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[TextChat] emotion: ${emotion}`);
+      }
+      setEmotionRef?.current?.(emotion);
 
       setThinking(false);
       onThinkingChange(false);

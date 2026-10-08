@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import BackgroundLayer from '@/components/alisha/BackgroundLayer';
 import VoiceChatButton from '@/components/alisha/VoiceChatButton';
 import TextChatButton from '@/components/alisha/TextChatButton';
@@ -14,6 +14,7 @@ import { stopSpeaking } from '@/lib/alisha/speech';
 import { useTouchGestures } from '@/hooks/use-touch-gestures';
 import { nextBackground, prevBackground } from '@/lib/alisha/types';
 import ThemeToggle from '@/components/alisha/ThemeToggle';
+import type { Emotion } from '@/lib/alisha/emotion';
 
 // Lazy-load Live2DAvatar so pixi.js + pixi-live2d-display (combined ~600KB)
 // don't ship in the initial bundle. They're loaded on demand when the
@@ -76,6 +77,10 @@ export default function Home() {
   const [thinking, setThinking] = useState(false);
   const { background, responseLanguage, avatarId, setBackground, theme, setTheme } = useAlishaStore();
   const viewportHeight = useVisualViewportHeight();
+
+  // Store the setEmotion function from Live2DAvatar so VoiceChatButton /
+  // TextChatButton can trigger emotion changes when the AI responds.
+  const setEmotionRef = useRef<((emotion: Emotion) => void) | null>(null);
 
   // Touch gestures: swipe horizontally to cycle backgrounds, pinch to zoom.
   const { pinchScale } = useTouchGestures({
@@ -190,6 +195,7 @@ export default function Home() {
                 listening={listening}
                 thinking={thinking}
                 avatarId={avatarId}
+                onEmotionReady={(fn) => { setEmotionRef.current = fn; }}
               />
             </Suspense>
           </AlishaErrorBoundary>
@@ -231,12 +237,14 @@ export default function Home() {
             }}
             onListeningChange={setListening}
             onThinkingChange={setThinking}
+            setEmotionRef={setEmotionRef}
           />
           <TextChatButton
             onSpeakingChange={(s) => {
               setSpeaking(s)
             }}
             onThinkingChange={setThinking}
+            setEmotionRef={setEmotionRef}
           />
         </div>
       </footer>

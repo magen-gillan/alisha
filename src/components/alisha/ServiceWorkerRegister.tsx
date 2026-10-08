@@ -5,6 +5,10 @@ import { useEffect } from 'react';
 /**
  * Registers the service worker on the client.
  * Mounted once at the app root (in layout.tsx) — never blocks rendering.
+ *
+ * Also listens for `controllerchange` so the page reloads automatically
+ * when a new service worker activates (ensures users always run the
+ * latest app code after a deploy).
  */
 export default function ServiceWorkerRegister() {
   useEffect(() => {
@@ -17,7 +21,6 @@ export default function ServiceWorkerRegister() {
       navigator.serviceWorker
         .register('/sw.js', { scope: '/' })
         .catch((err) => {
-          // Don't spam the console in production.
           if (process.env.NODE_ENV !== 'production') {
             console.warn('[sw] registration failed:', err);
           }
@@ -28,8 +31,19 @@ export default function ServiceWorkerRegister() {
       onLoad();
     } else {
       window.addEventListener('load', onLoad, { once: true });
-      return () => window.removeEventListener('load', onLoad);
     }
+
+    // Reload the page when a new service worker takes control so the
+    // user gets the latest app code immediately.
+    const onControllerChange = () => {
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+
+    return () => {
+      window.removeEventListener('load', onLoad);
+      navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+    };
   }, []);
 
   return null;
