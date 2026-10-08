@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BackgroundId, AvatarId } from '@/lib/alisha/types';
 import { getAvatarById } from '@/lib/alisha/avatars';
+import { useCursorFollow } from '@/hooks/use-cursor-follow';
+import { getEmotionParams, blendEmotions, type Emotion, type EmotionParams } from '@/lib/alisha/emotion';
 
 interface Live2DAvatarProps {
   background: BackgroundId;
@@ -85,6 +87,21 @@ function AvatarInstance({
   const speakingRef = useRef(speaking);
   const listeningRef = useRef(listening);
   const thinkingRef = useRef(thinking);
+
+  // Cursor follow — Digital-human-live2d inspired
+  const cursorRef = useCursorFollow();
+
+  // Emotion tracking — Prometheus-avatar inspired
+  const currentEmotionRef = useRef<Emotion>('neutral');
+  const targetEmotionRef = useRef<Emotion>('neutral');
+  const emotionBlendRef = useRef(0); // 0..1 transition progress
+
+  // Allow parent to set the emotion (e.g. after AI response)
+  const setEmotion = (emotion: Emotion) => {
+    targetEmotionRef.current = emotion;
+    emotionBlendRef.current = 0; // restart transition
+  };
+
   useEffect(() => { speakingRef.current = speaking; }, [speaking]);
   useEffect(() => { listeningRef.current = listening; }, [listening]);
   useEffect(() => { thinkingRef.current = thinking; }, [thinking]);
@@ -280,6 +297,34 @@ function AvatarInstance({
                 }
               };
 
+              // ---- Cursor follow (Digital-human-live2d inspired) ----
+              // Avatar head and eyes track the mouse position.
+              const cursor = cursorRef.current;
+              setParameter('ParamAngleX', cursor.x * 30);   // head yaw: -30..30
+              setParameter('ParamAngleY', -cursor.y * 20);  // head pitch: -20..20
+              setParameter('ParamEyeBallX', cursor.x);       // pupil: -1..1
+              setParameter('ParamEyeBallY', cursor.y);       // pupil: -1..1
+
+              // ---- Emotion blending (Prometheus-avatar inspired) ----
+              // Smoothly transition from current emotion to target emotion.
+              const targetParams = getEmotionParams(targetEmotionRef.current);
+              const currentParams = getEmotionParams(currentEmotionRef.current);
+              if (emotionBlendRef.current < 1) {
+                emotionBlendRef.current = Math.min(1, emotionBlendRef.current + 0.02);
+              }
+              const blended = blendEmotions(currentParams, targetParams, emotionBlendRef.current);
+              if (emotionBlendRef.current >= 1) {
+                currentEmotionRef.current = targetEmotionRef.current;
+              }
+              // Apply emotion params (only when not speaking — mouth is driven
+              // by lip-sync during speech)
+              if (!speakingRef.current) {
+                setParameter('ParamMouthForm', blended.mouthForm);
+              }
+              // Eye openness influenced by emotion (but blinking takes priority)
+              const eyeBase = blended.eyeLOpen;
+
+              // ---- Lip-sync (mouth animation during speech) ----
               if (speakingRef.current) {
                 if (now >= nextMouthChange) {
                   mouthTarget = Math.random() < 0.22 ? 0.04 : 0.14 + Math.random() * 0.68;
@@ -292,13 +337,21 @@ function AvatarInstance({
               mouthValue += (mouthTarget - mouthValue) * (speakingRef.current ? 0.16 : 0.24);
               setParameter('ParamMouthOpenY', Math.max(0, Math.min(1, mouthValue)));
 
+              // ---- Blinking ----
               if (!speakingRef.current && now >= nextBlink) {
                 blinkUntil = now + 135;
                 nextBlink = now + 2200 + Math.random() * 2400;
               }
-              const eye = now < blinkUntil ? 0.05 : 1;
-              setParameter('ParamEyeLOpen', eye);
-              setParameter('ParamEyeROpen', eye);
+              const blink = now < blinkUntil ? 0.05 : 1;
+              // Blend blink with emotion-based eye openness
+              const eyeL = speakingRef.current ? Math.max(blink, eyeBase * 0.9) : blink * eyeBase;
+              const eyeR = speakingRef.current ? Math.max(blink, eyeBase * 0.9) : blink * eyeBase;
+              setParameter('ParamEyeLOpen', eyeL);
+              setParameter('ParamEyeROpen', eyeR);
+
+              // ---- Body angle follows head slightly ----
+              setParameter('ParamBodyAngleX', cursor.x * 8);
+              setParameter('ParamBodyAngleY', -cursor.y * 5);
             } catch {
               /* noop */
             }

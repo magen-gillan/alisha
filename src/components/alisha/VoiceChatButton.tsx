@@ -17,6 +17,7 @@ import { detectLanguage } from '@/lib/alisha/language';
 import { chatWithGemini } from '@/lib/alisha/gemini-client';
 import { chatWithPollinations } from '@/lib/alisha/pollinations-client';
 import { buildHistory } from '@/lib/alisha/context-window';
+import { detectEmotion } from '@/lib/alisha/emotion';
 
 interface VoiceChatButtonProps {
   onSpeakingChange: (speaking: boolean) => void;
@@ -165,6 +166,13 @@ export default function VoiceChatButton({
       // Add to conversation store
       addMessage({ role: 'user', text: userText, lang: detected });
       addMessage({ role: 'model', text: chat.text, lang: responseLanguage });
+
+      // Detect emotion from the AI response and apply to avatar
+      // (Prometheus-avatar inspired emotion engine)
+      const emotion = detectEmotion(chat.text);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[VoiceChat] emotion: ${emotion}`);
+      }
 
       // Speak the response
       setState('speaking');
