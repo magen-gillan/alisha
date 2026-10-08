@@ -139,6 +139,8 @@ export const useAlishaStore = create<AlishaStore>()(
       reset: () =>
         set({
           ...DEFAULTS,
+          // Create a fresh array instead of sharing DEFAULTS.conversation reference
+          conversation: [],
           permanentMemory: DEFAULT_PERMANENT_MEMORY,
         }),
     }),

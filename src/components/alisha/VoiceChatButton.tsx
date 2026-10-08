@@ -17,18 +17,20 @@ import { detectLanguage } from '@/lib/alisha/language';
 import { chatWithGemini } from '@/lib/alisha/gemini-client';
 import { chatWithPollinations } from '@/lib/alisha/pollinations-client';
 import { buildHistory } from '@/lib/alisha/context-window';
-import { detectEmotion } from '@/lib/alisha/emotion';
+import { detectEmotion, type Emotion } from '@/lib/alisha/emotion';
 
 interface VoiceChatButtonProps {
   onSpeakingChange: (speaking: boolean) => void;
   onListeningChange: (listening: boolean) => void;
   onThinkingChange: (thinking: boolean) => void;
+  setEmotionRef?: React.MutableRefObject<((emotion: Emotion) => void) | null>;
 }
 
 export default function VoiceChatButton({
   onSpeakingChange,
   onListeningChange,
   onThinkingChange,
+  setEmotionRef,
 }: VoiceChatButtonProps) {
   const [state, setState] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
   const requestIdRef = useRef(0);
@@ -173,6 +175,8 @@ export default function VoiceChatButton({
       if (process.env.NODE_ENV !== 'production') {
         console.log(`[VoiceChat] emotion: ${emotion}`);
       }
+      // Apply emotion to the avatar via the ref callback
+      setEmotionRef?.current?.(emotion);
 
       // Speak the response
       setState('speaking');

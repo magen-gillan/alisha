@@ -12,6 +12,8 @@ interface Live2DAvatarProps {
   listening: boolean;
   thinking: boolean;
   avatarId: AvatarId;
+  /** Called when the avatar is ready; receives a setEmotion function */
+  onEmotionReady?: (setEmotion: (emotion: Emotion) => void) => void;
 }
 
 /**
@@ -59,13 +61,14 @@ export default function Live2DAvatar({
   listening,
   thinking,
   avatarId,
+  onEmotionReady,
 }: Live2DAvatarProps) {
   // Use a `key` that changes with avatarId so React fully unmounts + remounts
   // the entire canvas subtree. This is the SIMPLEST and most reliable way to
   // guarantee a fresh canvas + fresh PIXI Application on every switch.
   // (PIXI throws "Canvas already in use" if you reuse a canvas that was
   // bound to a previously-destroyed Application — even after destroy(true).)
-  return <AvatarInstance key={avatarId} background={background} speaking={speaking} listening={listening} thinking={thinking} avatarId={avatarId} />;
+  return <AvatarInstance key={avatarId} background={background} speaking={speaking} listening={listening} thinking={thinking} avatarId={avatarId} onEmotionReady={onEmotionReady} />;
 }
 
 function AvatarInstance({
@@ -74,6 +77,7 @@ function AvatarInstance({
   listening,
   thinking,
   avatarId,
+  onEmotionReady,
 }: Live2DAvatarProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -361,6 +365,11 @@ function AvatarInstance({
         raf = requestAnimationFrame(tick);
 
         setLoadState('ready');
+        // Expose setEmotion to parent so it can trigger emotion changes
+        // when the AI response is received.
+        if (onEmotionReady) {
+          onEmotionReady(setEmotion);
+        }
       } catch (err: any) {
         if (cancelled) return;
         console.error('[Live2DAvatar] init failed:', err);

@@ -12,6 +12,8 @@ interface Props {
 interface State {
   hasError: boolean;
   error?: Error;
+  /** Increments on each reset to force remount of children */
+  resetKey: number;
 }
 
 /**
@@ -25,11 +27,11 @@ interface State {
 export default class AlishaErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, resetKey: 0 };
   }
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error, resetKey: 0 };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
@@ -39,7 +41,10 @@ export default class AlishaErrorBoundary extends React.Component<Props, State> {
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: undefined });
+    // Increment resetKey to force React to remount the children with a
+    // fresh key — this ensures any corrupted state in the child is
+    // discarded, not just the error flag.
+    this.setState((prev) => ({ hasError: false, error: undefined, resetKey: prev.resetKey + 1 }));
   };
 
   render() {
@@ -62,6 +67,7 @@ export default class AlishaErrorBoundary extends React.Component<Props, State> {
         </div>
       );
     }
-    return this.props.children;
+    // Use resetKey as the key prop so children are fully remounted on reset
+    return <div key={this.state.resetKey}>{this.props.children}</div>;
   }
 }
