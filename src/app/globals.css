@@ -301,3 +301,69 @@ button:active:not(:disabled) {
   button:active:not(:disabled) { transform: none !important; }
   * { transition-duration: 0.01ms !important; }
 }
+
+
+/* ===== [ملف] 1. SVG logo breathe animation — already in logo.svg ===== */
+/* The logo.svg has a built-in .z-breathe animation class. */
+
+/* ===== [ملف] 2. Rotating CSS glow border using @property ===== */
+@property --glow-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.alisha-glow-card {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0.75rem;
+}
+
+.alisha-glow-card::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--glow-angle),
+    #f472b6,
+    #8b5cf6,
+    #22d3ee,
+    #f472b6
+  );
+  animation: rotate-glow 4s linear infinite;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.alisha-glow-card:hover::before,
+.alisha-glow-card.is-active::before {
+  opacity: 1;
+}
+
+@keyframes rotate-glow {
+  to { --glow-angle: 360deg; }
+}
+
+/* ===== [ملف] 3. mix-blend-mode: difference for header title ===== */
+.alisha-header-title {
+  color: white;
+  mix-blend-mode: difference;
+}
+
+/* ===== [ملف] 5. Touch-friendly rows: minimum 44px height ===== */
+.alisha-touch-row {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+/* ===== [ملف] 6. Reduce excessive gradients / centering ===== */
+/* Already handled by removing unnecessary decorative text in SettingsPanel. */
+
+/* ===== Reduced motion: disable glow + breathe ===== */
+@media (prefers-reduced-motion: reduce) {
+  .alisha-glow-card::before { animation: none !important; opacity: 0 !important; }
+  .z-breathe { animation: none !important; opacity: 1 !important; }
+}

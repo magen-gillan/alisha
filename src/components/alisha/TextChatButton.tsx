@@ -14,6 +14,7 @@ import {
 import { detectLanguage } from '@/lib/alisha/language';
 import { chatWithGemini } from '@/lib/alisha/gemini-client';
 import { chatWithPollinations } from '@/lib/alisha/pollinations-client';
+import { chatWithGeminiStream } from '@/lib/alisha/gemini-stream-client';
 import { buildHistory } from '@/lib/alisha/context-window';
 import { detectEmotion, type Emotion } from '@/lib/alisha/emotion';
 
@@ -100,17 +101,38 @@ export default function TextChatButton({
         permanentMemory,
         signal: controller.signal,
       };
-      const chat = provider === 'pollinations'
-        ? await chatWithPollinations(chatReq, pollinationsApiKey || undefined)
-        : await chatWithGemini(chatReq, apiKey || undefined, geminiKeyChoice);
+
+      // Use streaming for Gemini, non-streaming for Pollinations.
+      let fullText = '';
+      if (provider === 'pollinations') {
+        const chat = await chatWithPollinations(chatReq, pollinationsApiKey || undefined);
+        fullText = chat.text;
+      } else {
+        // Stream Gemini responses — show text as it arrives
+        try {
+          for await (const chunk of chatWithGeminiStream(chatReq, apiKey || undefined, geminiKeyChoice)) {
+            if (requestId !== requestIdRef.current) return;
+            if (chunk.text) {
+              fullText += chunk.text;
+            }
+          }
+        } catch (streamErr: any) {
+          // Fallback to non-streaming if stream fails
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('[TextChat] stream failed, falling back to non-stream:', streamErr?.message);
+          }
+          const chat = await chatWithGemini(chatReq, apiKey || undefined, geminiKeyChoice);
+          fullText = chat.text;
+        }
+      }
 
       if (requestId !== requestIdRef.current) return;
 
       // Add only the model response; the user message was saved before the request.
-      addMessage({ role: 'model', text: chat.text, lang: responseLanguage });
+      addMessage({ role: 'model', text: fullText, lang: responseLanguage });
 
       // Detect emotion from the AI response and apply to avatar
-      const emotion = detectEmotion(chat.text);
+      const emotion = detectEmotion(fullText);
       if (process.env.NODE_ENV !== 'production') {
         console.log(`[TextChat] emotion: ${emotion}`);
       }
@@ -127,7 +149,7 @@ export default function TextChatButton({
       }
 
       speak({
-        text: chat.text,
+        text: fullText,
         language: responseLanguage,
         voiceLanguage,
         voiceURI,
