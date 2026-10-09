@@ -455,6 +455,8 @@ function AvatarInstance({
 
       <div
         className={`pointer-events-none absolute inset-0 rounded-full transition-all duration-300 ${
+          speaking || listening || thinking ? 'alisha-glow-card is-active' : ''
+        } ${
           speaking
             ? 'shadow-[0_0_60px_15px_rgba(168,85,247,0.45)]'
             : listening

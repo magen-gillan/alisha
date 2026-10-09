@@ -353,9 +353,9 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                         key={p}
                         type="button"
                         onClick={() => setProvider(p)}
-                        className={`text-right rounded-lg border-2 p-3 transition-all ${
+                        className={`alisha-touch-row text-right rounded-lg border-2 p-3 transition-all w-full ${
                           isSelected
-                            ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
+                            ? 'alisha-glow-card is-active border-primary bg-primary/10 ring-2 ring-primary/30'
                             : 'border-white/10 bg-white/5 hover:border-muted-foreground/30'
                         }`}
                       >

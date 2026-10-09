@@ -162,7 +162,7 @@ export default function Home() {
             alt="Alisha"
             className="h-10 w-10 rounded-full border border-white/40 object-cover shadow-lg shadow-fuchsia-900/30"
           />
-          <span className="text-base sm:text-lg font-semibold text-white drop-shadow">
+          <span className="alisha-header-title text-base sm:text-lg font-semibold">
             Alisha
           </span>
         </div>
