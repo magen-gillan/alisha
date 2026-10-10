@@ -181,10 +181,10 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Avatar area — flex-1 takes remaining space, centers avatar */}
-      <section className="relative z-10 flex-1 flex items-center justify-center px-2 min-h-0 overflow-hidden pb-2">
+      {/* Avatar area — cinematic full-screen presentation */}
+      <section className="relative z-10 flex-1 flex items-end justify-center min-h-0 overflow-hidden">
         <div
-          className="relative w-full h-full max-w-[min(88vw,28rem)] max-h-[min(62vh,34rem)] mx-auto flex items-center justify-center transition-transform duration-200"
+          className="relative w-full h-full mx-auto flex items-end justify-center"
           style={{ transform: `scale(${pinchScale})` }}
         >
           <AlishaErrorBoundary label="Avatar">
