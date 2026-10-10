@@ -99,6 +99,11 @@ export default function Home() {
     return () => stopSpeaking();
   }, []);
 
+  // Clear setEmotionRef when avatar switches (old function is stale)
+  useEffect(() => {
+    setEmotionRef.current = null;
+  }, [avatarId]);
+
   // Set document direction based on response language for Arabic
   useEffect(() => {
     if (typeof document === 'undefined') return;
