@@ -84,7 +84,6 @@ function AvatarInstance({
   // Motion system state
   const motionStateRef = useRef<'idle' | 'speaking' | 'listening' | 'thinking' | 'tap'>('idle');
   const lastIdleMotionRef = useRef(0);
-  const motionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setEmotion = useCallback((emotion: Emotion) => {
     targetEmotionRef.current = emotion;
@@ -383,7 +382,6 @@ function AvatarInstance({
     return () => {
       cancelled = true;
       if (raf) cancelAnimationFrame(raf);
-      if (motionTimerRef.current) clearTimeout(motionTimerRef.current);
       if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
       if (onResize) {
         window.removeEventListener('resize', onResize);

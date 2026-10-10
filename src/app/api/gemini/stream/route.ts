@@ -33,12 +33,18 @@ function resolveKeys(clientKey: string, keyChoice: string | undefined | null): s
 }
 
 const RATE_LIMIT_PER_MINUTE = 60;
+const RATE_LIMIT_MAP_MAX_SIZE = 1000;
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
   if (!entry || entry.resetAt < now) {
+    if (rateLimitMap.size > RATE_LIMIT_MAP_MAX_SIZE) {
+      for (const [key, val] of rateLimitMap) {
+        if (val.resetAt < now) rateLimitMap.delete(key);
+      }
+    }
     rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
     return false;
   }

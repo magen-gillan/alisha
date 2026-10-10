@@ -97,7 +97,7 @@ export default function TextChatButton({
         detectedLanguage: detected,
         responseLanguage,
         model: provider === 'pollinations' ? pollinationsModel : model,
-        history: buildHistory(conversation),
+        history: buildHistory(historyRef.current),
         permanentMemory,
         signal: controller.signal,
       };
@@ -117,11 +117,19 @@ export default function TextChatButton({
             }
           }
         } catch (streamErr: any) {
-          // Fallback to non-streaming if stream fails
+          // If the stream was aborted (user cancelled), don't fallback
+          if (streamErr?.name === 'AbortError' || requestId !== requestIdRef.current) {
+            return;
+          }
+          // Fallback to non-streaming with a NEW controller (the old one
+          // might have been partially consumed by the stream attempt)
           if (process.env.NODE_ENV !== 'production') {
             console.warn('[TextChat] stream failed, falling back to non-stream:', streamErr?.message);
           }
-          const chat = await chatWithGemini(chatReq, apiKey || undefined, geminiKeyChoice);
+          const fallbackController = new AbortController();
+          abortRef.current = fallbackController;
+          const fallbackReq = { ...chatReq, signal: fallbackController.signal };
+          const chat = await chatWithGemini(fallbackReq, apiKey || undefined, geminiKeyChoice);
           fullText = chat.text;
         }
       }
