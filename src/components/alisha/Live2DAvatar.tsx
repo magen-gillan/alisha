@@ -187,7 +187,7 @@ function AvatarInstance({
         // 5) Anchor at bottom-center for cinematic presentation
         //    anchor (0.5, 1.0) = bottom center of the model's canvas
         try {
-          model.anchor.set(0.5, 0.85);
+          model.anchor.set(0.5, 0.5);
         } catch {}
 
         // 6) Cinematic fit — character fills most of the screen,
@@ -204,16 +204,14 @@ function AvatarInstance({
           const mw = internal?.originalWidth || modelRef.current.originalWidth || internal?.canvasWidth || 1024;
           const mh = internal?.originalHeight || modelRef.current.originalHeight || internal?.canvasHeight || 1024;
 
-          // Scale to fill height (not width) — character is tall
-          // Use 1.0 multiplier for full-screen presence (was 0.9 before)
-          const scale = (ch / mh) * 1.0;
+          // Scale to fit the container while keeping aspect ratio.
+          // Use 0.95 multiplier so the model has a small margin.
+          const scale = Math.min(cw / mw, ch / mh) * 0.95;
           try { modelRef.current.scale.set(scale); } catch {}
-          // Position: center horizontally, bottom vertically
-          // With anchor (0.5, 0.85), y = ch positions the model's
-          // 85% point at the bottom of the screen
+          // Position: center of container
           try {
             modelRef.current.x = cw / 2;
-            modelRef.current.y = ch * 0.95;
+            modelRef.current.y = ch / 2;
           } catch {}
         };
 
@@ -446,7 +444,7 @@ function AvatarInstance({
     <div
       ref={containerRef}
       onClick={handleTap}
-      className="relative w-full h-full flex items-end justify-center overflow-hidden cursor-pointer"
+      className="relative w-full h-full flex items-center justify-center overflow-hidden cursor-pointer"
       aria-label="Alisha avatar"
       role="button"
       tabIndex={0}
@@ -542,7 +540,7 @@ function FallbackAvatar({
   error?: string;
 }) {
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-end gap-3 text-center pb-8">
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
       <div
         className={`relative w-48 h-48 sm:w-64 sm:h-64 rounded-full overflow-hidden bg-gradient-to-br from-pink-200 via-purple-200 to-indigo-200 shadow-2xl ${
           speaking ? 'animate-pulse' : listening ? 'animate-bounce' : thinking ? 'animate-spin-slow' : 'animate-float'
