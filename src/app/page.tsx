@@ -8,7 +8,7 @@ import SettingsPanel from '@/components/alisha/SettingsPanel';
 import StatusBar from '@/components/alisha/StatusBar';
 import AlishaErrorBoundary from '@/components/alisha/AlishaErrorBoundary';
 import { Button } from '@/components/ui/button';
-import { Settings, Loader2 } from 'lucide-react';
+import { Settings, Loader2, Sliders } from 'lucide-react';
 import { useAlishaStore } from '@/store/alisha-store';
 import { stopSpeaking } from '@/lib/alisha/speech';
 import { useTouchGestures } from '@/hooks/use-touch-gestures';
@@ -172,7 +172,17 @@ export default function Home() {
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <a href="/avatar-studio" aria-label="Avatar Studio">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/10"
+              aria-label="Avatar Studio"
+            >
+              <Sliders className="w-5 h-5" />
+            </Button>
+          </a>
           <ThemeToggle theme={theme} onToggle={setTheme} />
           <Button
             variant="ghost"

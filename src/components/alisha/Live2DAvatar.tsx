@@ -456,12 +456,12 @@ function AvatarInstance({
       <div
         className={`pointer-events-none absolute inset-0 transition-all duration-500 ${
           speaking
-            ? 'shadow-[inset_0_-20px_80px_20px_rgba(168,85,247,0.3)]'
+            ? 'shadow-[0_0_80px_20px_rgba(168,85,247,0.25)]'
             : listening
-            ? 'shadow-[inset_0_-20px_80px_20px_rgba(236,72,153,0.25)]'
+            ? 'shadow-[0_0_80px_20px_rgba(236,72,153,0.2)]'
             : thinking
-            ? 'shadow-[inset_0_-20px_80px_20px_rgba(59,130,246,0.25)]'
-            : 'shadow-[inset_0_-20px_60px_15px_rgba(168,85,247,0.12)]'
+            ? 'shadow-[0_0_80px_20px_rgba(59,130,246,0.2)]'
+            : ''
         }`}
       />
 

@@ -158,6 +158,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
 
   // ---- API key UI ----
   const [showApiKey, setShowApiKey] = useState(false);
+  const [activeTab, setActiveTab] = useState<'general' | 'keys'>('general');
   const [showPollinationsKey, setShowPollinationsKey] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState(apiKey);
   const [pollinationsKeyInput, setPollinationsKeyInput] = useState(pollinationsApiKey);
@@ -331,9 +332,36 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
         </SheetHeader>
 
         <ScrollArea className="flex-1 px-5 pb-5">
+          {/* Tab buttons */}
+          <div className="flex gap-2 mb-4 sticky top-0 bg-[#241b35]/95 backdrop-blur-xl py-2 z-10">
+            <button
+              type="button"
+              onClick={() => setActiveTab('general')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === 'general'
+                  ? 'bg-fuchsia-500/20 border-2 border-fuchsia-500/50 text-white'
+                  : 'border-2 border-white/10 text-white/60 hover:text-white hover:border-white/30'
+              }`}
+            >
+              عام
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('keys')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === 'keys'
+                  ? 'bg-fuchsia-500/20 border-2 border-fuchsia-500/50 text-white'
+                  : 'border-2 border-white/10 text-white/60 hover:text-white hover:border-white/30'
+              }`}
+            >
+              المفاتيح
+            </button>
+          </div>
+
+          {activeTab === 'general' && (
           <Accordion
             type="multiple"
-            defaultValue={['provider', 'keys', 'language']}
+            defaultValue={['provider', 'avatar', 'language']}
             className="w-full settings-accordion"
           >
             {/* ============ Section 0: AI Provider ============ */}
@@ -370,244 +398,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                       </button>
                     );
                   })}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            {/* ============ Section 1: API Keys & Models ============ */}
-            <AccordionItem value="keys">
-              <AccordionTrigger className="text-base font-semibold">
-                <span className="flex items-center gap-2">
-                  <KeyRound className="w-4 h-4" />
-                  المفاتيح والموديلات
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-3 pt-2">
-                <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                      <span className="text-xs text-white/70">مصدر المفتاح</span>
-                  <Badge variant={hasKey ? 'secondary' : 'destructive'} className="text-[10px]">{keySourceLabel}</Badge>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">مفتاح Gemini API</Label>
-                    <a
-                      href="https://aistudio.google.com/app/apikey"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-                    >
-                      احصل على مفتاح <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type={showApiKey ? 'text' : 'password'}
-                      value={apiKeyInput}
-                      onChange={(e) => handleApiKeyChange(e.target.value)}
-                      placeholder=""
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey((s) => !s)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      aria-label={showApiKey ? 'إخفاء المفتاح' : 'إظهار المفتاح'}
-                    >
-                      {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Gemini server-side key choice */}
-                <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-3">
-                  <Label className="text-sm font-medium">مفتاح Gemini الخادمي</Label>
-                  <div className="grid grid-cols-1 gap-1.5 mt-1">
-                    {(['auto', 'primary', 'legacy'] as GeminiKeyChoice[]).map((choice) => {
-                      const isSelected = geminiKeyChoice === choice;
-                      return (
-                        <button
-                          key={choice}
-                          type="button"
-                          onClick={() => setGeminiKeyChoice(choice)}
-                          className={`text-right rounded-md border-2 p-2.5 transition-all ${
-                            isSelected
-                              ? 'border-primary bg-primary/10'
-                              : 'border-white/10 bg-white/5 hover:border-muted-foreground/30'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold">
-                              {GEMINI_KEY_CHOICE_LABELS[choice]}
-                            </span>
-                            {isSelected && (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Model selection */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <Label className="text-sm font-medium">موديل Gemini</Label>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={fetchModels}
-                        disabled={loadingModels}
-                        className="h-7 px-2"
-                      >
-                        {loadingModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void testConnection()}
-                        disabled={testingConnection}
-                        className="h-7 px-2 border-emerald-300/30"
-                      >
-                        {testingConnection ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-                      </Button>
-                    </div>
-                  </div>
-                  {modelsError ? (
-                    <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-xs">
-                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                      <div>{modelsError}</div>
-                    </div>
-                  ) : null}
-                  <Select
-                    value={models.some((m) => m.name === model) ? model : (models[0]?.name || 'gemini-flash-latest')}
-                    onValueChange={setModel}
-                    disabled={loadingModels && models.length === 0}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="">
-                        {model || ''}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {models.length === 0 && !loadingModels ? (
-                        <SelectItem value={model || 'gemini-flash-latest'}>
-                          {model || 'gemini-flash-latest'}
-                        </SelectItem>
-                      ) : (
-                        models.map((m) => (
-                          <SelectItem key={m.name} value={m.name}>
-                            <div className="flex flex-col">
-                              <span>{m.displayName}</span>
-                              <span className="text-xs text-muted-foreground">{m.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* ============ Pollinations API key ============ */}
-                <div className="mt-5 pt-4 border-t border-white/10">
-                  <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                    <span className="text-xs text-white/70">مفتاح Pollinations</span>
-                    <Badge variant={pollinationsHasSource ? 'secondary' : 'destructive'} className="text-[10px]">
-                      {pollinationsKeySourceLabel}
-                    </Badge>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium">مفتاح Pollinations</Label>
-                      <a
-                        href="https://pollinations.ai/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-                      >
-                        Pollinations.ai <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type={showPollinationsKey ? 'text' : 'password'}
-                        value={pollinationsKeyInput}
-                        onChange={(e) => handlePollinationsKeyChange(e.target.value)}
-                        placeholder=""
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        autoComplete="off"
-                        spellCheck={false}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPollinationsKey((s) => !s)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        aria-label={showPollinationsKey ? 'إخفاء المفتاح' : 'إظهار المفتاح'}
-                      >
-                        {showPollinationsKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Pollinations model selection */}
-                  <div className="space-y-2 mt-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <Label className="text-sm font-medium">موديل Pollinations</Label>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={fetchPollinationsModels}
-                          disabled={loadingPollinationsModels}
-                          className="h-7 px-2"
-                        >
-                          {loadingPollinationsModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                        </Button>
-                      </div>
-                    </div>
-                    {pollinationsModelsError ? (
-                      <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-xs">
-                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                        <div>{pollinationsModelsError}</div>
-                      </div>
-                    ) : null}
-                    <Select
-                      value={
-                        pollinationsModels.some((m) => m.name === pollinationsModel)
-                          ? pollinationsModel
-                          : (pollinationsModels[0]?.name || 'openai-fast')
-                      }
-                      onValueChange={setPollinationsModel}
-                      disabled={loadingPollinationsModels && pollinationsModels.length === 0}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="">
-                          {pollinationsModel || ''}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {pollinationsModels.length === 0 && !loadingPollinationsModels ? (
-                          <SelectItem value={pollinationsModel || 'openai-fast'}>
-                            {pollinationsModel || 'openai-fast'}
-                          </SelectItem>
-                        ) : (
-                          pollinationsModels.map((m) => (
-                            <SelectItem key={m.name} value={m.name}>
-                              <div className="flex flex-col">
-                                <span>{m.displayName}</span>
-                                <span className="text-xs text-muted-foreground">{m.name}</span>
-                              </div>
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -960,6 +750,259 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+          )}
+
+          {activeTab === 'keys' && (
+          <Accordion
+            type="multiple"
+            defaultValue={['gemini-keys', 'pollinations-keys']}
+            className="w-full settings-accordion"
+          >
+            {/* Gemini Keys */}
+            <AccordionItem value="gemini-keys">
+              <AccordionTrigger className="text-base font-semibold">
+                <span className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4" />
+                  مفاتيح Gemini
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3 pt-2">
+                <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                  <span className="text-xs text-white/70">مصدر المفتاح</span>
+                  <Badge variant={hasKey ? 'secondary' : 'destructive'} className="text-[10px]">{keySourceLabel}</Badge>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">مفتاح Gemini API</Label>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      احصل على مفتاح <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      value={apiKeyInput}
+                      onChange={(e) => handleApiKeyChange(e.target.value)}
+                      placeholder=""
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey((s) => !s)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showApiKey ? 'إخفاء المفتاح' : 'إظهار المفتاح'}
+                    >
+                      {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Gemini server-side key choice */}
+                <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-3">
+                  <Label className="text-sm font-medium">مفتاح Gemini الخادمي</Label>
+                  <div className="grid grid-cols-1 gap-1.5 mt-1">
+                    {(['auto', 'primary', 'legacy'] as GeminiKeyChoice[]).map((choice) => {
+                      const isSelected = geminiKeyChoice === choice;
+                      return (
+                        <button
+                          key={choice}
+                          type="button"
+                          onClick={() => setGeminiKeyChoice(choice)}
+                          className={`text-right rounded-md border-2 p-2.5 transition-all ${
+                            isSelected
+                              ? 'border-primary bg-primary/10'
+                              : 'border-white/10 bg-white/5 hover:border-muted-foreground/30'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold">
+                              {GEMINI_KEY_CHOICE_LABELS[choice]}
+                            </span>
+                            {isSelected && (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Gemini Model selection */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-sm font-medium">موديل Gemini</Label>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={fetchModels}
+                        disabled={loadingModels}
+                        className="h-7 px-2"
+                      >
+                        {loadingModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void testConnection()}
+                        disabled={testingConnection}
+                        className="h-7 px-2 border-emerald-300/30"
+                      >
+                        {testingConnection ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                      </Button>
+                    </div>
+                  </div>
+                  {modelsError ? (
+                    <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-xs">
+                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                      <div>{modelsError}</div>
+                    </div>
+                  ) : null}
+                  <Select
+                    value={models.some((m) => m.name === model) ? model : (models[0]?.name || 'gemini-flash-latest')}
+                    onValueChange={setModel}
+                    disabled={loadingModels && models.length === 0}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="">
+                        {model || ''}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.length === 0 && !loadingModels ? (
+                        <SelectItem value={model || 'gemini-flash-latest'}>
+                          {model || 'gemini-flash-latest'}
+                        </SelectItem>
+                      ) : (
+                        models.map((m) => (
+                          <SelectItem key={m.name} value={m.name}>
+                            <div className="flex flex-col">
+                              <span>{m.displayName}</span>
+                              <span className="text-xs text-muted-foreground">{m.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Pollinations Keys */}
+            <AccordionItem value="pollinations-keys">
+              <AccordionTrigger className="text-base font-semibold">
+                <span className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4" />
+                  مفاتيح Pollinations
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3 pt-2">
+                <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                  <span className="text-xs text-white/70">مصدر مفتاح Pollinations</span>
+                  <Badge variant={pollinationsHasSource ? 'secondary' : 'destructive'} className="text-[10px]">
+                    {pollinationsKeySourceLabel}
+                  </Badge>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">مفتاح Pollinations</Label>
+                    <a
+                      href="https://pollinations.ai/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      Pollinations.ai <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showPollinationsKey ? 'text' : 'password'}
+                      value={pollinationsKeyInput}
+                      onChange={(e) => handlePollinationsKeyChange(e.target.value)}
+                      placeholder=""
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPollinationsKey((s) => !s)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showPollinationsKey ? 'إخفاء المفتاح' : 'إظهار المفتاح'}
+                    >
+                      {showPollinationsKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Pollinations model selection */}
+                <div className="space-y-2 mt-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-sm font-medium">موديل Pollinations</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={fetchPollinationsModels}
+                      disabled={loadingPollinationsModels}
+                      className="h-7 px-2"
+                    >
+                      {loadingPollinationsModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    </Button>
+                  </div>
+                  {pollinationsModelsError ? (
+                    <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-xs">
+                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                      <div>{pollinationsModelsError}</div>
+                    </div>
+                  ) : null}
+                  <Select
+                    value={
+                      pollinationsModels.some((m) => m.name === pollinationsModel)
+                        ? pollinationsModel
+                        : (pollinationsModels[0]?.name || 'openai-fast')
+                    }
+                    onValueChange={setPollinationsModel}
+                    disabled={loadingPollinationsModels && pollinationsModels.length === 0}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="">
+                        {pollinationsModel || ''}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pollinationsModels.length === 0 && !loadingPollinationsModels ? (
+                        <SelectItem value={pollinationsModel || 'openai-fast'}>
+                          {pollinationsModel || 'openai-fast'}
+                        </SelectItem>
+                      ) : (
+                        pollinationsModels.map((m) => (
+                          <SelectItem key={m.name} value={m.name}>
+                            <div className="flex flex-col">
+                              <span>{m.displayName}</span>
+                              <span className="text-xs text-muted-foreground">{m.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+          )}
 
           <div className="sticky bottom-0 z-10 mt-6 space-y-2 border-t border-white/10 bg-[#241b35]/95 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
             <Button onClick={handleSave} className="w-full bg-gradient-to-r from-fuchsia-500 to-violet-600 text-white shadow-lg shadow-fuchsia-900/30 hover:from-fuchsia-400 hover:to-violet-500">
