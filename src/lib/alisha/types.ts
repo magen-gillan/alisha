@@ -54,14 +54,8 @@ export interface AlishaSettings {
   avatarId: AvatarId;
   /** UI color theme. */
   theme: AppTheme;
-  /** Selected Gemini model ID. */
+  /** Selected model ID (optional — router picks automatically). */
   model: string;
-  /** Selected Pollinations model ID (used when provider='pollinations'). */
-  pollinationsModel: string;
-  /** Active AI provider. */
-  provider: AIProvider;
-  /** Which Gemini server key to prefer when no client key is set. */
-  geminiKeyChoice: GeminiKeyChoice;
   /** Speech rate for TTS (0.5 - 2.0). */
   speechRate: number;
   /** Speech pitch for TTS (0 - 2). */

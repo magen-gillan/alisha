@@ -2,8 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AlishaSettings, ResponseLanguage, BackgroundId, AIProvider, GeminiKeyChoice, AvatarId, AppTheme } from '@/lib/alisha/types';
-import { DEPRECATED_MODELS } from '@/lib/alisha/gemini-client';
+import type { AlishaSettings, ResponseLanguage, BackgroundId, AvatarId, AppTheme } from '@/lib/alisha/types';
 
 export interface ChatMessage {
   id: string;
@@ -14,11 +13,9 @@ export interface ChatMessage {
 }
 
 interface AlishaStore extends AlishaSettings {
-  /** User-set Gemini API key (overrides the build-time baked-in key). */
-  apiKey: string;
-  /** User-set Pollinations API key (optional; anonymous tier is the fallback). */
-  pollinationsApiKey: string;
-  /** Permanent memory — instructions injected into every Gemini request. */
+  /** Provider keys for the unified LLM router (from FreeLLMAPI integration). */
+  providerKeys: Record<string, string>;
+  /** Permanent memory — instructions injected into every request. */
   permanentMemory: string;
   /** Voice language for TTS (BCP-47, e.g. ar-SA, ja-JP, en-US). */
   voiceLanguage: string;
@@ -31,14 +28,11 @@ interface AlishaStore extends AlishaSettings {
   setBackground: (bg: BackgroundId) => void;
   setAvatarId: (id: AvatarId) => void;
   setTheme: (theme: AppTheme) => void;
-  setModel: (model: string) => void;
-  setPollinationsModel: (model: string) => void;
-  setProvider: (provider: AIProvider) => void;
-  setGeminiKeyChoice: (choice: GeminiKeyChoice) => void;
+  setProviderKeys: (keys: Record<string, string>) => void;
+  updateProviderKey: (providerId: string, key: string) => void;
+  removeProviderKey: (providerId: string) => void;
   setSpeechRate: (rate: number) => void;
   setSpeechPitch: (pitch: number) => void;
-  setApiKey: (key: string) => void;
-  setPollinationsApiKey: (key: string) => void;
   setPermanentMemory: (text: string) => void;
   setVoiceLanguage: (lang: string) => void;
   setVoiceURI: (uri: string) => void;
@@ -51,20 +45,19 @@ interface AlishaStore extends AlishaSettings {
 const DEFAULT_PERMANENT_MEMORY = `# ذاكرة دائمة — تعليمات لا تُنسى أبداً
 
 ## الهوية
-- اسم الذكاء الاصطناعي: اليشيا (Alisha)
+- اسم الذكاء الاصطناعي: Alisha
 - اسم المستخدم: غيلان بن عقبة
 
 ## التعليمات الدائمة
 - تعامل مع غيلان بن عقبة باحترام وودّ.
 - اذكر اسم المستخدم أحياناً بشكل طبيعي.
-- لا تنسَ أبداً أن اسمك اليشيا وأن محدثك هو غيلان بن عقبة.
+- لا تنسَ أبداً أن اسمك Alisha وأن محدثك هو غيلان بن عقبة.
 - كن دافئاً وعاطفياً وداعماً.
 - اجعل الردود قصيرة (1-3 جمل) لأنها ستُنطق بصوت عالٍ.
 - لا تكشف أبداً أنك نموذج لغوي أو ذكاء اصطناعي.`;
 
 const DEFAULTS: AlishaSettings & {
-  apiKey: string;
-  pollinationsApiKey: string;
+  providerKeys: Record<string, string>;
   permanentMemory: string;
   voiceLanguage: string;
   voiceURI: string;
@@ -74,20 +67,10 @@ const DEFAULTS: AlishaSettings & {
   background: 'aurora',
   avatarId: 'kei',
   theme: 'dark',
-  // gemini-flash-latest is the only model that works for new Gemini API keys
-  // (gemini-2.0-flash, gemini-1.5-flash, gemini-2.5-flash are all deprecated
-  //  for new users as of 2026).
-  model: 'gemini-flash-latest',
-  // Pollinations: openai-fast is always available (anonymous tier).
-  pollinationsModel: 'openai-fast',
-  // Default provider is Gemini (preserves existing user behaviour).
-  provider: 'gemini',
-  // Default: prefer the new (primary) server key, fall back to legacy.
-  geminiKeyChoice: 'auto',
+  model: '',
+  providerKeys: {},
   speechRate: 1.0,
   speechPitch: 1.0,
-  apiKey: '',
-  pollinationsApiKey: '',
   permanentMemory: DEFAULT_PERMANENT_MEMORY,
   voiceLanguage: 'ar-SA',
   voiceURI: '',
@@ -106,14 +89,19 @@ export const useAlishaStore = create<AlishaStore>()(
       setBackground: (bg) => set({ background: bg }),
       setAvatarId: (id) => set({ avatarId: id }),
       setTheme: (theme) => set({ theme }),
-      setModel: (model) => set({ model }),
-      setPollinationsModel: (model) => set({ pollinationsModel: model }),
-      setProvider: (provider) => set({ provider }),
-      setGeminiKeyChoice: (choice) => set({ geminiKeyChoice: choice }),
+      setProviderKeys: (keys) => set({ providerKeys: keys }),
+      updateProviderKey: (providerId, key) =>
+        set((state) => ({
+          providerKeys: { ...state.providerKeys, [providerId]: key },
+        })),
+      removeProviderKey: (providerId) =>
+        set((state) => {
+          const keys = { ...state.providerKeys };
+          delete keys[providerId];
+          return { providerKeys: keys };
+        }),
       setSpeechRate: (rate) => set({ speechRate: rate }),
       setSpeechPitch: (pitch) => set({ speechPitch: pitch }),
-      setApiKey: (key) => set({ apiKey: key }),
-      setPollinationsApiKey: (key) => set({ pollinationsApiKey: key }),
       setPermanentMemory: (text) => set({ permanentMemory: text }),
       setVoiceLanguage: (lang) => set({ voiceLanguage: lang }),
       setVoiceURI: (uri) => set({ voiceURI: uri }),
@@ -122,7 +110,7 @@ export const useAlishaStore = create<AlishaStore>()(
           conversation: [
             ...state.conversation,
             { ...msg, id: genId(), ts: Date.now() },
-          ].slice(-100), // keep last 100 messages
+          ].slice(-100),
         })),
       removeLastUserMessage: (text) =>
         set((state) => {
@@ -139,72 +127,47 @@ export const useAlishaStore = create<AlishaStore>()(
       reset: () =>
         set({
           ...DEFAULTS,
-          // Create a fresh array instead of sharing DEFAULTS.conversation reference
+          providerKeys: {},
           conversation: [],
           permanentMemory: DEFAULT_PERMANENT_MEMORY,
         }),
     }),
     {
       name: 'alisha-settings',
-      version: 10,
-      // Persist conversation across reloads too — the user often wants to
-      // continue where they left off after closing the tab.
+      version: 11,
       partialize: (state) => ({
         responseLanguage: state.responseLanguage,
         background: state.background,
         avatarId: state.avatarId,
         theme: state.theme,
         model: state.model,
-        pollinationsModel: state.pollinationsModel,
-        provider: state.provider,
-        geminiKeyChoice: state.geminiKeyChoice,
+        providerKeys: state.providerKeys,
         speechRate: state.speechRate,
         speechPitch: state.speechPitch,
-        apiKey: state.apiKey,
-        pollinationsApiKey: state.pollinationsApiKey,
         permanentMemory: state.permanentMemory,
         voiceLanguage: state.voiceLanguage,
         voiceURI: state.voiceURI,
         conversation: state.conversation,
       }),
       migrate: (persisted: any, version: number) => {
-        // v3 → v4 (and any future version): replace any deprecated model
-        // name with gemini-flash-latest. gemini-2.x and gemini-1.5 are all
-        // deprecated for new Gemini API keys as of 2026.
-        if (persisted && typeof persisted.model === 'string') {
-          if (DEPRECATED_MODELS.has(persisted.model)) {
-            persisted.model = 'gemini-flash-latest';
-          }
-        }
-        // v5 → v6: add Pollinations provider settings with sensible defaults
-        // if missing, but NEVER override what the user explicitly set.
         if (!persisted) return persisted;
-        if (typeof persisted.provider !== 'string') {
-          persisted.provider = 'gemini';
+        // v10 → v11: migrate from old provider/key system to unified providerKeys
+        const oldKeys: Record<string, string> = {};
+        if (typeof persisted.apiKey === 'string' && persisted.apiKey.trim()) {
+          oldKeys['google'] = persisted.apiKey;
         }
-        if (typeof persisted.pollinationsModel !== 'string' || !persisted.pollinationsModel) {
-          persisted.pollinationsModel = 'openai-fast';
+        if (typeof persisted.pollinationsApiKey === 'string' && persisted.pollinationsApiKey.trim()) {
+          oldKeys['pollinations'] = persisted.pollinationsApiKey;
         }
-        if (typeof persisted.pollinationsApiKey !== 'string') {
-          persisted.pollinationsApiKey = '';
-        }
-        // v6 → v7: add Gemini key choice. Default to 'auto' for existing users
-        // so they keep the same behaviour (primary first, legacy fallback).
-        if (typeof persisted.geminiKeyChoice !== 'string' ||
-            !['auto', 'primary', 'legacy'].includes(persisted.geminiKeyChoice)) {
-          persisted.geminiKeyChoice = 'auto';
-        }
-        // v8 → v9: add avatarId. Default to 'kei' for existing users so they
-        // don't see any visual change.
-        if (typeof persisted.avatarId !== 'string' ||
-            !['kei', 'jane', 'icegirl', 'ganyu', 'miara'].includes(persisted.avatarId)) {
-          persisted.avatarId = 'kei';
-        }
-        // v9 → v10: add app theme (default 'dark' to preserve look).
-        if (typeof persisted.theme !== 'string' ||
-            !['dark', 'light'].includes(persisted.theme)) {
-          persisted.theme = 'dark';
-        }
+        persisted.providerKeys = oldKeys;
+        // Remove old fields
+        delete persisted.apiKey;
+        delete persisted.pollinationsApiKey;
+        delete persisted.provider;
+        delete persisted.geminiKeyChoice;
+        delete persisted.pollinationsModel;
+        // Ensure new fields exist
+        if (typeof persisted.model !== 'string') persisted.model = '';
         return persisted;
       },
     }
