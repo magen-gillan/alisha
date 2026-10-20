@@ -14,8 +14,8 @@ import {
   loadVoices,
 } from '@/lib/alisha/speech';
 import { detectLanguage } from '@/lib/alisha/language';
-import { chatWithGemini } from '@/lib/alisha/gemini-client';
-import { chatWithPollinations } from '@/lib/alisha/pollinations-client';
+import { chatWithRouter } from '@/lib/alisha/router-client';
+
 import { buildHistory } from '@/lib/alisha/context-window';
 import { detectEmotion, type Emotion } from '@/lib/alisha/emotion';
 
@@ -159,9 +159,7 @@ export default function VoiceChatButton({
         permanentMemory,
         signal: controller.signal,
       };
-      const chat = provider === 'pollinations'
-        ? await chatWithPollinations(chatReq, pollinationsApiKey || undefined)
-        : await chatWithGemini(chatReq, apiKey || undefined, geminiKeyChoice);
+      const chat = await chatWithRouter(chatReq);
 
       if (requestId !== requestIdRef.current) return;
 
