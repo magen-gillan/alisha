@@ -12,9 +12,9 @@ import {
   loadVoices,
 } from '@/lib/alisha/speech';
 import { detectLanguage } from '@/lib/alisha/language';
-import { chatWithGemini } from '@/lib/alisha/gemini-client';
-import { chatWithPollinations } from '@/lib/alisha/pollinations-client';
-import { chatWithGeminiStream } from '@/lib/alisha/gemini-stream-client';
+import { chatWithRouter } from '@/lib/alisha/router-client';
+
+
 import { buildHistory } from '@/lib/alisha/context-window';
 import { detectEmotion, type Emotion } from '@/lib/alisha/emotion';
 
@@ -102,39 +102,12 @@ export default function TextChatButton({
         signal: controller.signal,
       };
 
-      // Use streaming for Gemini, non-streaming for Pollinations.
-      let fullText = '';
-      if (provider === 'pollinations') {
-        const chat = await chatWithPollinations(chatReq, pollinationsApiKey || undefined);
-        fullText = chat.text;
-      } else {
-        // Stream Gemini responses — show text as it arrives
-        try {
-          for await (const chunk of chatWithGeminiStream(chatReq, apiKey || undefined, geminiKeyChoice)) {
-            if (requestId !== requestIdRef.current) return;
-            if (chunk.text) {
-              fullText += chunk.text;
-            }
-          }
-        } catch (streamErr: any) {
-          // If the stream was aborted (user cancelled), don't fallback
-          if (streamErr?.name === 'AbortError' || requestId !== requestIdRef.current) {
-            return;
-          }
-          // Fallback to non-streaming with a NEW controller (the old one
-          // might have been partially consumed by the stream attempt)
-          if (process.env.NODE_ENV !== 'production') {
-            console.warn('[TextChat] stream failed, falling back to non-stream:', streamErr?.message);
-          }
-          const fallbackController = new AbortController();
-          abortRef.current = fallbackController;
-          const fallbackReq = { ...chatReq, signal: fallbackController.signal };
-          const chat = await chatWithGemini(fallbackReq, apiKey || undefined, geminiKeyChoice);
-          fullText = chat.text;
-        }
-      }
+      // Use the unified router — automatically tries all providers
+      const chat = await chatWithRouter(chatReq);
 
       if (requestId !== requestIdRef.current) return;
+
+      const fullText = chat.text;
 
       // Add only the model response; the user message was saved before the request.
       addMessage({ role: 'model', text: fullText, lang: responseLanguage });
