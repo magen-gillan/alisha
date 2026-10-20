@@ -37,12 +37,6 @@ export default function VoiceChatButton({
   const abortRef = useRef<AbortController | null>(null);
   const {
     responseLanguage,
-    model,
-    pollinationsModel,
-    provider,
-    apiKey,
-    pollinationsApiKey,
-    geminiKeyChoice,
     speechRate,
     speechPitch,
     voiceLanguage,
@@ -143,18 +137,13 @@ export default function VoiceChatButton({
     try {
       const detected = detectLanguage(userText);
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[VoiceChat] lang=${detected} → ${responseLanguage} via ${provider} (${userText.length} chars)`);
+        console.log(`[VoiceChat] lang=${detected} → ${responseLanguage} (${userText.length} chars)`);
       }
 
       const chatReq = {
         userInput: userText,
         detectedLanguage: detected,
         responseLanguage,
-        // Pick the right model id for whichever provider is active
-        model: provider === 'pollinations' ? pollinationsModel : model,
-        // Use historyRef.current (always up-to-date) instead of the captured
-        // `conversation` closure, so messages added while the mic is open
-        // are properly included.
         history: buildHistory(historyRef.current),
         permanentMemory,
         signal: controller.signal,
@@ -202,9 +191,8 @@ export default function VoiceChatButton({
       });
     } catch (err: any) {
       if (err?.name === 'AbortError' || requestId !== requestIdRef.current) return;
-      console.error(`[VoiceChat] ${provider} error:`, err);
-      const providerLabel = provider === 'pollinations' ? 'Pollinations' : 'Gemini';
-      toast.error(err?.message || `Failed to get a response from ${providerLabel}.`);
+      console.error('[VoiceChat] error:', err);
+      toast.error(err?.message || 'Failed to get a response.');
       setState('idle');
       onThinkingChange(false);
       onSpeakingChange(false);

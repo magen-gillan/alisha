@@ -39,12 +39,6 @@ export default function TextChatButton({
   const lastSubmittedTextRef = useRef<string>('');
   const {
     responseLanguage,
-    model,
-    pollinationsModel,
-    provider,
-    apiKey,
-    pollinationsApiKey,
-    geminiKeyChoice,
     speechRate,
     speechPitch,
     voiceLanguage,
@@ -89,14 +83,13 @@ export default function TextChatButton({
     try {
       const detected = detectLanguage(text);
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[TextChat] lang=${detected} → ${responseLanguage} via ${provider} (${text.length} chars)`);
+        console.log(`[TextChat] lang=${detected} → ${responseLanguage} (${text.length} chars)`);
       }
 
       const chatReq = {
         userInput: text,
         detectedLanguage: detected,
         responseLanguage,
-        model: provider === 'pollinations' ? pollinationsModel : model,
         history: buildHistory(historyRef.current),
         permanentMemory,
         signal: controller.signal,
@@ -148,9 +141,8 @@ export default function TextChatButton({
       if (err?.name === 'AbortError' || requestId !== requestIdRef.current) return;
       setInput(text);
       removeLastUserMessage(text);
-      console.error(`[TextChat] ${provider} error:`, err);
-      const providerLabel = provider === 'pollinations' ? 'Pollinations' : 'Gemini';
-      toast.error(err?.message || `Failed to get a response from ${providerLabel}.`);
+      console.error('[TextChat] error:', err);
+      toast.error(err?.message || 'Failed to get a response.');
       setThinking(false);
       onThinkingChange(false);
       onSpeakingChange(false);

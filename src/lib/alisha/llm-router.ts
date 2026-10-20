@@ -127,39 +127,25 @@ export const FREE_PROVIDERS: Omit<LLMProvider, 'apiKey' | 'enabled'>[] = [
     priority: 7,
   },
   {
-    id: 'cloudflare',
-    name: 'Cloudflare AI',
-    baseUrl: 'https://api.cloudflare.com/client/v4/accounts',
-    models: ['@cf/meta/llama-3.1-8b-instruct'],
-    priority: 8,
-  },
-  {
-    id: 'huggingface',
-    name: 'HuggingFace',
-    baseUrl: 'https://api-inference.huggingface.co',
-    models: ['meta-llama/Llama-3.3-70B-Instruct'],
-    priority: 9,
-  },
-  {
     id: 'samba',
     name: 'SambaNova',
     baseUrl: 'https://api.sambanova.ai/v1',
     models: ['Meta-Llama-3.1-70B-Instruct'],
-    priority: 10,
+    priority: 8,
   },
   {
     id: 'nvidia',
     name: 'NVIDIA',
     baseUrl: 'https://integrate.api.nvidia.com/v1',
     models: ['meta/llama-3.3-70b-instruct'],
-    priority: 11,
+    priority: 9,
   },
   {
     id: 'zhipu',
     name: 'Z.ai',
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     models: ['glm-4-flash', 'glm-4-flashx'],
-    priority: 12,
+    priority: 10,
   },
   {
     id: 'custom',
@@ -230,9 +216,7 @@ export async function routeChat(
         model = provider.models[0];
       }
 
-      const url = provider.id === 'google'
-        ? `${provider.baseUrl}/chat/completions`
-        : `${provider.baseUrl}/chat/completions`;
+      const url = `${provider.baseUrl}/chat/completions`;
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',

@@ -89,7 +89,8 @@ export interface ChatRequest {
   userInput: string;
   detectedLanguage: ResponseLanguage;
   responseLanguage: ResponseLanguage;
-  model: string;
+  /** Model ID — optional; the router picks automatically if omitted. */
+  model?: string;
   history?: { role: 'user' | 'model'; text: string }[];
   /** Permanent memory text injected as system instruction. */
   permanentMemory?: string;
