@@ -6,6 +6,15 @@
 
 <p align="center"><strong>أفاتار تفاعلي يعمل مع Gemini AI أو Pollinations.ai وLive2D</strong></p>
 
+<p align="center">
+  <a href="https://alisha-puce.vercel.app"><img src="https://img.shields.io/badge/%F0%9F%8C%90_Live_site-alisha--puce.vercel.app-8A2BE2" alt="Live site" /></a>
+  <a href="https://github.com/magen-gillan/alisha/releases/download/android-v1.0.2/Alisha-Android-v1.0.2.apk"><img src="https://img.shields.io/badge/%F0%9F%93%B1_Android_APK-v1.0.2-green" alt="Android APK" /></a>
+</p>
+
+**EN:** Alisha is an interactive AI companion with a Live2D avatar, text & voice chat (Gemini or Pollinations.ai), supporting Arabic, English, and Japanese. It is built with Next.js and deployed on Vercel, with a stable Android APK release.
+
+**Try it now | جرّبها الآن: [alisha-puce.vercel.app](https://alisha-puce.vercel.app)** · **Download Android APK | تحميل تطبيق أندرويد: [v1.0.2](https://github.com/magen-gillan/alisha/releases/download/android-v1.0.2/Alisha-Android-v1.0.2.apk)**
+
 Alisha واجهة محادثة تفاعلية تدعم الكتابة والصوت، وتستجيب باللغة التي يحددها المستخدم. يعمل التطبيق على Next.js ويُنشَر على Vercel، مع إبقاء المفاتيح الخادمية داخل متغيرات بيئية وعدم تضمينها في JavaScript العام.
 
 ## المزايا
@@ -57,6 +66,13 @@ bun run build
 ## النشر
 
 الموقع الإنتاجي متاح على [alisha-puce.vercel.app](https://alisha-puce.vercel.app).
+
+## إصدار أندرويد | Android release
+
+| الإصدار | التحميل المباشر |
+|---|---|
+| **android-v1.0.2** (مستقر | stable) | [Alisha-Android-v1.0.2.apk](https://github.com/magen-gillan/alisha/releases/download/android-v1.0.2/Alisha-Android-v1.0.2.apk) |
+| نسخة تجريبية أحدث (beta، Honor X6c) | انظر [مستودع alisha-android](https://github.com/magen-gillan/alisha-android) |
 
 ## ملاحظات الأمان
 
