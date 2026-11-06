@@ -73,6 +73,8 @@ function AvatarInstance({
   const listeningRef = useRef(listening);
   const thinkingRef = useRef(thinking);
   const speechMouthRef = useRef({ value: 0, at: 0 });
+  const speechStartAtRef = useRef(0);
+  const speechBoundarySeenRef = useRef(false);
 
   // Cursor follow
   const cursorRef = useCursorFollow();
@@ -110,12 +112,24 @@ function AvatarInstance({
       const hasLetters = /[\p{L}\p{M}]/u.test(spokenPart);
       const vowels = (spokenPart.match(/[aeiouyаеёиоуыэюяاأإآؤئيىةَُِّٰあいうえおアイウエオ]/giu) || []).length;
       const value = !hasLetters ? 0.03 : Math.min(0.82, 0.22 + vowels * 0.11);
+      speechBoundarySeenRef.current = true;
       speechMouthRef.current = { value, at: performance.now() };
     };
-    const onEnd = () => { speechMouthRef.current = { value: 0, at: 0 }; };
+    const onStart = () => {
+      speechStartAtRef.current = performance.now();
+      speechBoundarySeenRef.current = false;
+      speechMouthRef.current = { value: 0, at: 0 };
+    };
+    const onEnd = () => {
+      speechStartAtRef.current = 0;
+      speechBoundarySeenRef.current = false;
+      speechMouthRef.current = { value: 0, at: 0 };
+    };
+    window.addEventListener('alisha:tts-start', onStart);
     window.addEventListener('alisha:tts-boundary', onBoundary);
     window.addEventListener('alisha:tts-end', onEnd);
     return () => {
+      window.removeEventListener('alisha:tts-start', onStart);
       window.removeEventListener('alisha:tts-boundary', onBoundary);
       window.removeEventListener('alisha:tts-end', onEnd);
     };
@@ -325,15 +339,18 @@ function AvatarInstance({
               // ---- Lip-sync ----
               if (speakingRef.current) {
                 const sync = speechMouthRef.current;
-                if (sync.at > 0 && now - sync.at < 900) {
-                  // Small jaw movement between word events keeps the mouth
-                  // from appearing frozen while staying aligned to speech.
-                  mouthTarget = sync.value * (0.82 + 0.18 * Math.max(0, Math.sin(now * 0.018)));
-                } else if (now >= nextMouthChange) {
+                const age = sync.at > 0 ? now - sync.at : Infinity;
+                if (age >= 0 && age < 260) {
+                  // Open on the word event, then close quickly before the
+                  // next word to avoid lagging an entire syllable behind.
+                  mouthTarget = sync.value * Math.max(0, 1 - age / 260);
+                } else if (!speechBoundarySeenRef.current && speechStartAtRef.current > 0 && now - speechStartAtRef.current > 500 && now >= nextMouthChange) {
                   // Compatibility fallback: some mobile TTS engines omit
                   // SpeechSynthesis boundary events entirely.
                   mouthTarget = Math.random() < 0.22 ? 0.04 : 0.14 + Math.random() * 0.68;
                   nextMouthChange = now + 90 + Math.random() * 130;
+                } else {
+                  mouthTarget = 0;
                 }
               } else {
                 mouthTarget = 0;

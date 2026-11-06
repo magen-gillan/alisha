@@ -13,6 +13,7 @@ import {
 } from '@/lib/alisha/speech';
 import { detectLanguage } from '@/lib/alisha/language';
 import { chatWithRouter } from '@/lib/alisha/router-client';
+import { beginChatRequest, cancelChatRequests } from '@/lib/alisha/chat-request';
 
 
 import { buildHistory } from '@/lib/alisha/context-window';
@@ -59,6 +60,18 @@ export default function TextChatButton({
     loadVoices();
   }, []);
 
+  useEffect(() => {
+    const onCancelled = () => {
+      requestIdRef.current += 1;
+      abortRef.current = null;
+      setThinking(false);
+      onThinkingChange(false);
+      onSpeakingChange(false);
+    };
+    window.addEventListener('alisha:chat-cancelled', onCancelled);
+    return () => window.removeEventListener('alisha:chat-cancelled', onCancelled);
+  }, [onSpeakingChange, onThinkingChange]);
+
   // Focus the textarea when opened
   useEffect(() => {
     if (open && textareaRef.current) {
@@ -71,9 +84,11 @@ export default function TextChatButton({
     const text = input.trim();
     if (!text || thinking) return;
 
+    const request = beginChatRequest();
     const requestId = ++requestIdRef.current;
-    const controller = new AbortController();
+    const controller = request.controller;
     abortRef.current = controller;
+    stopSpeaking();
     lastSubmittedTextRef.current = text;
     setInput('');
     setThinking(true);
@@ -98,7 +113,7 @@ export default function TextChatButton({
       // Use the unified router — automatically tries all providers
       const chat = await chatWithRouter(chatReq);
 
-      if (requestId !== requestIdRef.current) return;
+      if (!request.isCurrent() || requestId !== requestIdRef.current) return;
 
       const fullText = chat.text;
 
@@ -114,7 +129,6 @@ export default function TextChatButton({
 
       setThinking(false);
       onThinkingChange(false);
-      onSpeakingChange(true);
 
       if (!isTTSSupported()) {
         toast.error('Text-to-speech is not supported in this browser.');
@@ -129,16 +143,18 @@ export default function TextChatButton({
         voiceURI,
         rate: speechRate,
         pitch: speechPitch,
-        onStart: () => onSpeakingChange(true),
-        onEnd: () => onSpeakingChange(false),
+        onStart: () => { if (request.isCurrent()) onSpeakingChange(true); },
+        onEnd: () => { if (request.isCurrent()) onSpeakingChange(false); },
         onError: (e) => {
           console.error('TTS error:', e);
-          toast.error(`Text-to-speech error: ${e}`);
+          toast.error(e === 'response_language_mismatch'
+            ? 'تم إيقاف النطق لأن الرد جاء بلغة غير مدعومة. تحقق من لغة الرد.'
+            : `Text-to-speech error: ${e}`);
           onSpeakingChange(false);
         },
       });
     } catch (err: any) {
-      if (err?.name === 'AbortError' || requestId !== requestIdRef.current) return;
+      if (err?.name === 'AbortError' || !request.isCurrent() || requestId !== requestIdRef.current) return;
       setInput(text);
       removeLastUserMessage(text);
       console.error('[TextChat] error:', err);
@@ -147,12 +163,14 @@ export default function TextChatButton({
       onThinkingChange(false);
       onSpeakingChange(false);
     } finally {
+      request.finish();
       if (requestId === requestIdRef.current) abortRef.current = null;
     }
   };
 
   const handleCancel = () => {
     requestIdRef.current += 1;
+    cancelChatRequests();
     abortRef.current?.abort();
     abortRef.current = null;
     stopSpeaking();

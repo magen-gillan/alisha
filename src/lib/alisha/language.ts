@@ -13,7 +13,8 @@
 import type { ResponseLanguage } from './types';
 
 const ARABIC_RANGE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-const JAPANESE_RANGE = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF]/;
+const JAPANESE_KANA_RANGE = /[\u3040-\u309F\u30A0-\u30FF]/;
+const HAN_RANGE = /[\u3400-\u4DBF\u4E00-\u9FFF]/;
 const KOREAN_RANGE = /[\uAC00-\uD7AF\u1100-\u11FF]/;
 const CYRILLIC_RANGE = /[\u0400-\u04FF]/;
 
@@ -23,8 +24,12 @@ export function detectLanguage(text: string): ResponseLanguage {
   // Arabic script (covers Arabic, Persian, Urdu) → respond in Arabic
   if (ARABIC_RANGE.test(text)) return 'ar';
 
-  // Japanese scripts (Hiragana / Katakana / Kanji) → respond in Japanese
-  if (JAPANESE_RANGE.test(text)) return 'ja';
+  // Kana reliably distinguishes Japanese from Chinese Han-only text.
+  if (JAPANESE_KANA_RANGE.test(text)) return 'ja';
+
+  // Han-only text is ambiguous and commonly Chinese; keep it out of the
+  // Japanese-only response path and use the product's English fallback.
+  if (HAN_RANGE.test(text)) return 'en';
 
   // Korean & Cyrillic are detected but we fall back to English
   // since Alisha only supports {en, ar, ja} as response languages.

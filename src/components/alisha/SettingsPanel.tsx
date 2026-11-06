@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
@@ -21,12 +22,13 @@ import { useAlishaStore, DEFAULT_PERMANENT_MEMORY } from '@/store/alisha-store';
 import type { ResponseLanguage, BackgroundId } from '@/lib/alisha/types';
 import { LANGUAGE_LABELS, BACKGROUND_LABELS, VOICE_LANGUAGES, BACKGROUND_ORDER, nextBackground, prevBackground } from '@/lib/alisha/types';
 import { AVATAR_MODELS } from '@/lib/alisha/avatars';
+import { loadAvatarStudioDraft } from '@/lib/alisha/avatar-studio-draft';
 import { FREE_PROVIDERS, type LLMProvider } from '@/lib/alisha/llm-router';
 import { getProviderKeys, setProviderKeys, listRouterModels } from '@/lib/alisha/router-client';
 import { shareOrDownload } from '@/lib/alisha/share';
 import CloseButton from '@/components/alisha/CloseButton';
 import {
-  loadVoices, getVoicesForLanguage, speak, stopSpeaking,
+  loadVoices, getVoicesForLanguage, safeVoiceLocale, speak, stopSpeaking,
 } from '@/lib/alisha/speech';
 import {
   Loader2, RefreshCw, AlertCircle, Eye, EyeOff, ExternalLink,
@@ -69,17 +71,26 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     setVoiceLanguage, setVoiceURI, clearConversation,
   } = useAlishaStore();
 
-  const [activeTab, setActiveTab] = useState<'general' | 'keys'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'keys' | 'tuning'>('general');
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [previewingVoice, setPreviewingVoice] = useState(false);
   const [routerModels, setRouterModels] = useState<Array<{ id: string; provider: string; name: string }>>([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState(false);
+  const [studioDraft, setStudioDraft] = useState(() => ({ calibrations: {}, thumbnails: {} } as ReturnType<typeof loadAvatarStudioDraft>));
+  const allowedVoiceLanguage = safeVoiceLocale(voiceLanguage, responseLanguage);
 
   useEffect(() => {
-    loadVoices().then(() => setVoices(getVoicesForLanguage(voiceLanguage)));
-  }, [voiceLanguage, open]);
+    loadVoices().then(() => setVoices(getVoicesForLanguage(allowedVoiceLanguage)));
+  }, [allowedVoiceLanguage, open]);
+
+  useEffect(() => {
+    const refresh = () => setStudioDraft(loadAvatarStudioDraft());
+    refresh();
+    window.addEventListener('alisha:avatar-studio-draft-updated', refresh);
+    return () => window.removeEventListener('alisha:avatar-studio-draft-updated', refresh);
+  }, [open]);
 
   const fetchModels = async () => {
     setLoadingModels(true);
@@ -95,7 +106,8 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
 
   useEffect(() => {
     if (open && activeTab === 'keys' && routerModels.length === 0 && !loadingModels) {
-      void fetchModels();
+      const timer = window.setTimeout(() => { void fetchModels(); }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, [open, activeTab]);
 
@@ -159,6 +171,17 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
             >
               المفاتيح
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('tuning')}
+              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
+                activeTab === 'tuning'
+                  ? 'bg-fuchsia-500/20 border-2 border-fuchsia-500/50 text-white'
+                  : 'border-2 border-white/10 text-white/60 hover:text-white hover:border-white/30'
+              }`}
+            >
+              ضبط مؤقت
+            </button>
           </div>
 
           {activeTab === 'general' && (
@@ -175,9 +198,9 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                         className={`group relative overflow-hidden rounded-lg border-2 p-0 text-left transition-all ${
                           avatarId === m.id ? 'border-fuchsia-500 ring-2 ring-fuchsia-500/30' : 'border-white/10 hover:border-white/30'
                         }`}>
-                        {m.thumbnailUrl ? (
+                        {(studioDraft.thumbnails[m.id] || m.thumbnailUrl) ? (
                           <div className="aspect-square w-full bg-black/30 overflow-hidden">
-                            <img src={m.thumbnailUrl} alt={m.name} className="h-full w-full object-cover object-top transition-transform group-hover:scale-105" />
+                            <img src={studioDraft.thumbnails[m.id] || m.thumbnailUrl} alt={m.name} className="h-full w-full object-cover object-top transition-transform group-hover:scale-105" />
                           </div>
                         ) : (
                           <div className="aspect-square w-full bg-muted/30 flex items-center justify-center text-3xl">{m.emoji}</div>
@@ -242,7 +265,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-medium flex items-center gap-1"><Volume2 className="w-3.5 h-3.5" /> لغة الصوت (TTS)</Label>
-                    <Select value={voiceLanguage} onValueChange={(v) => {
+                    <Select value={allowedVoiceLanguage} onValueChange={(v) => {
                       setVoiceLanguage(v);
                       setResponseLanguage(responseLanguageForVoice(v));
                       setVoiceURI('');
@@ -334,6 +357,25 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
+          )}
+
+          {activeTab === 'tuning' && (
+            <div className="space-y-4 rounded-xl border border-fuchsia-300/20 bg-fuchsia-500/5 p-4">
+              <div>
+                <h2 className="font-semibold">معايرة تجريبية للأفاتارات</h2>
+                <p className="mt-2 text-sm leading-relaxed text-white/65">اضبط حجم وموضع كل أفاتار وارفع أيقونة مؤقتة للمعرض. تحفظ هذه المسودات في هذا المتصفح فقط، ولا تغيّر الإعدادات الأساسية أو ملفات GitHub.</p>
+              </div>
+              <div className="space-y-2 text-xs text-white/70">
+                {AVATAR_MODELS.map((model) => {
+                  const calibration = studioDraft.calibrations[model.id];
+                  return <div key={model.id} className="flex items-center justify-between border-b border-white/10 pb-2"><span>{model.name}{studioDraft.thumbnails[model.id] ? ' · أيقونة تجريبية' : ''}</span><span>{calibration ? `${calibration.scale.toFixed(2)}× · X ${calibration.xOffset} · Y ${calibration.yOffset}` : 'غير مضبوط'}</span></div>;
+                })}
+              </div>
+              <Link href="/avatar-studio" onClick={() => onOpenChange(false)}>
+                <Button className="w-full bg-fuchsia-600 hover:bg-fuchsia-500">فتح استوديو المعايرة</Button>
+              </Link>
+              <p className="text-[11px] text-amber-100/70">بعد الاختبار، نزّل ملف المعايرات وصور WebP من الاستوديو وأرسلها للمراجعة؛ بعدها يمكن تثبيت المعتمد منها في المستودع.</p>
+            </div>
           )}
 
           {activeTab === 'keys' && (

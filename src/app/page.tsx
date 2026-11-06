@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Settings, Loader2, Sliders } from 'lucide-react';
 import { useAlishaStore } from '@/store/alisha-store';
 import { stopSpeaking } from '@/lib/alisha/speech';
+import { cancelChatRequests } from '@/lib/alisha/chat-request';
 import { useTouchGestures } from '@/hooks/use-touch-gestures';
 import { nextBackground, prevBackground } from '@/lib/alisha/types';
 import ThemeToggle from '@/components/alisha/ThemeToggle';
@@ -96,7 +97,10 @@ export default function Home() {
 
   // Stop any speech when unmounting
   useEffect(() => {
-    return () => stopSpeaking();
+    return () => {
+      cancelChatRequests();
+      stopSpeaking();
+    };
   }, []);
 
   // Clear setEmotionRef when avatar switches (old function is stale)

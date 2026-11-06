@@ -15,6 +15,7 @@ import {
 } from '@/lib/alisha/speech';
 import { detectLanguage } from '@/lib/alisha/language';
 import { chatWithRouter } from '@/lib/alisha/router-client';
+import { beginChatRequest, cancelChatRequests } from '@/lib/alisha/chat-request';
 
 import { buildHistory } from '@/lib/alisha/context-window';
 import { detectEmotion, type Emotion } from '@/lib/alisha/emotion';
@@ -57,6 +58,19 @@ export default function VoiceChatButton({
     loadVoices();
   }, []);
 
+  useEffect(() => {
+    const onCancelled = () => {
+      requestIdRef.current += 1;
+      stopListening();
+      setState('idle');
+      onListeningChange(false);
+      onThinkingChange(false);
+      onSpeakingChange(false);
+    };
+    window.addEventListener('alisha:chat-cancelled', onCancelled);
+    return () => window.removeEventListener('alisha:chat-cancelled', onCancelled);
+  }, [onListeningChange, onThinkingChange, onSpeakingChange]);
+
   // Warn once if browser lacks STT
   useEffect(() => {
     if (!isSTTSupported()) {
@@ -73,6 +87,7 @@ export default function VoiceChatButton({
     } else {
       // Cancel everything, including any in-flight network response.
       requestIdRef.current += 1;
+      cancelChatRequests();
       abortRef.current?.abort();
       abortRef.current = null;
       stopListening();
@@ -91,6 +106,9 @@ export default function VoiceChatButton({
       );
       return;
     }
+
+    cancelChatRequests();
+    stopSpeaking();
 
     setState('listening');
     onListeningChange(true);
@@ -131,8 +149,9 @@ export default function VoiceChatButton({
   };
 
   const sendToGemini = async (userText: string) => {
+    const request = beginChatRequest();
     const requestId = ++requestIdRef.current;
-    const controller = new AbortController();
+    const controller = request.controller;
     abortRef.current = controller;
     try {
       const detected = detectLanguage(userText);
@@ -150,7 +169,7 @@ export default function VoiceChatButton({
       };
       const chat = await chatWithRouter(chatReq);
 
-      if (requestId !== requestIdRef.current) return;
+      if (!request.isCurrent() || requestId !== requestIdRef.current) return;
 
       // Add to conversation store
       addMessage({ role: 'user', text: userText, lang: detected });
@@ -168,7 +187,6 @@ export default function VoiceChatButton({
       // Speak the response
       setState('speaking');
       onThinkingChange(false);
-      onSpeakingChange(true);
 
       speak({
         text: chat.text,
@@ -177,26 +195,32 @@ export default function VoiceChatButton({
         voiceURI,
         rate: speechRate,
         pitch: speechPitch,
-        onStart: () => onSpeakingChange(true),
+        onStart: () => {
+          if (request.isCurrent()) onSpeakingChange(true);
+        },
         onEnd: () => {
+          if (!request.isCurrent()) return;
           setState('idle');
           onSpeakingChange(false);
         },
         onError: (e) => {
           console.error('TTS error:', e);
-          toast.error(`Text-to-speech error: ${e}`);
+          toast.error(e === 'response_language_mismatch'
+            ? 'تم إيقاف النطق لأن الرد جاء بلغة غير مدعومة. تحقق من لغة الرد.'
+            : `Text-to-speech error: ${e}`);
           setState('idle');
           onSpeakingChange(false);
         },
       });
     } catch (err: any) {
-      if (err?.name === 'AbortError' || requestId !== requestIdRef.current) return;
+      if (err?.name === 'AbortError' || !request.isCurrent() || requestId !== requestIdRef.current) return;
       console.error('[VoiceChat] error:', err);
       toast.error(err?.message || 'Failed to get a response.');
       setState('idle');
       onThinkingChange(false);
       onSpeakingChange(false);
     } finally {
+      request.finish();
       if (requestId === requestIdRef.current) abortRef.current = null;
     }
   };

@@ -134,7 +134,7 @@ export const useAlishaStore = create<AlishaStore>()(
     }),
     {
       name: 'alisha-settings',
-      version: 11,
+      version: 12,
       partialize: (state) => ({
         responseLanguage: state.responseLanguage,
         background: state.background,
@@ -151,21 +151,26 @@ export const useAlishaStore = create<AlishaStore>()(
       }),
       migrate: (persisted: any, version: number) => {
         if (!persisted) return persisted;
-        // v10 → v11: migrate from old provider/key system to unified providerKeys
-        const oldKeys: Record<string, string> = {};
-        if (typeof persisted.apiKey === 'string' && persisted.apiKey.trim()) {
-          oldKeys['google'] = persisted.apiKey;
+        if (version < 11) {
+          // v10 → v11: migrate old keys without discarding already unified keys.
+          const oldKeys: Record<string, string> = { ...(persisted.providerKeys || {}) };
+          if (typeof persisted.apiKey === 'string' && persisted.apiKey.trim()) oldKeys.google = persisted.apiKey;
+          if (typeof persisted.pollinationsApiKey === 'string' && persisted.pollinationsApiKey.trim()) oldKeys.pollinations = persisted.pollinationsApiKey;
+          persisted.providerKeys = oldKeys;
+          delete persisted.apiKey;
+          delete persisted.pollinationsApiKey;
+          delete persisted.provider;
+          delete persisted.geminiKeyChoice;
+          delete persisted.pollinationsModel;
         }
-        if (typeof persisted.pollinationsApiKey === 'string' && persisted.pollinationsApiKey.trim()) {
-          oldKeys['pollinations'] = persisted.pollinationsApiKey;
+        if (version < 12) {
+          const voiceLocales = ['ar-SA', 'ar-EG', 'ja-JP', 'en-US', 'en-GB'];
+          if (!['ar', 'en', 'ja'].includes(persisted.responseLanguage)) persisted.responseLanguage = 'ar';
+          if (!voiceLocales.includes(persisted.voiceLanguage)) {
+            persisted.voiceLanguage = persisted.responseLanguage === 'ja' ? 'ja-JP' : persisted.responseLanguage === 'en' ? 'en-US' : 'ar-SA';
+            persisted.voiceURI = '';
+          }
         }
-        persisted.providerKeys = oldKeys;
-        // Remove old fields
-        delete persisted.apiKey;
-        delete persisted.pollinationsApiKey;
-        delete persisted.provider;
-        delete persisted.geminiKeyChoice;
-        delete persisted.pollinationsModel;
         // Ensure new fields exist
         if (typeof persisted.model !== 'string') persisted.model = '';
         return persisted;

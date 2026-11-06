@@ -176,7 +176,17 @@ export function getVoices(): SpeechSynthesisVoice[] {
 export function getVoicesForLanguage(lang: string): SpeechSynthesisVoice[] {
   const all = getVoices();
   const prefix = lang.toLowerCase().split('-')[0];
+  if (!['ar', 'en', 'ja'].includes(prefix)) return [];
   return all.filter((v) => v.lang.toLowerCase().startsWith(prefix));
+}
+
+/** Only allow the three product languages, even when old settings contain another locale. */
+export function safeVoiceLocale(voiceLanguage: string | undefined, language: ResponseLanguage): string {
+  const fallback = localeFor(language);
+  const candidate = (voiceLanguage || '').trim();
+  const prefix = candidate.toLowerCase().split('-')[0];
+  if (!['ar', 'en', 'ja'].includes(prefix)) return fallback;
+  return candidate;
 }
 
 function pickVoice(
@@ -184,31 +194,31 @@ function pickVoice(
   voiceLanguage?: string,
   voiceURI?: string
 ): SpeechSynthesisVoice | undefined {
+  const locale = safeVoiceLocale(voiceLanguage, language).toLowerCase();
+  const prefix = locale.split('-')[0];
+  const compatible = cachedVoices.filter((voice) => voice.lang.toLowerCase().startsWith(prefix));
   // 1. If a specific voice URI is set, use it
   if (voiceURI) {
-    const v = cachedVoices.find((x) => x.voiceURI === voiceURI);
+    const v = compatible.find((x) => x.voiceURI === voiceURI);
     if (v) return v;
   }
-  // 2. Try exact voiceLanguage match
-  if (voiceLanguage) {
-    const vl = voiceLanguage.toLowerCase();
-    let v = cachedVoices.find((x) => x.lang.toLowerCase() === vl);
-    if (v) return v;
-    const prefix = vl.split('-')[0];
-    v = cachedVoices.find((x) => x.lang.toLowerCase().startsWith(prefix));
-    if (v) return v;
-  }
-  // 3. Fall back to language-based locale
-  const locale = localeFor(language).toLowerCase();
-  const langPrefix = locale.split('-')[0];
-  let voice = cachedVoices.find((v) => v.lang.toLowerCase() === locale);
-  if (voice) return voice;
-  voice = cachedVoices.find((v) => v.lang.toLowerCase().startsWith(langPrefix));
-  return voice;
+  return compatible.find((voice) => voice.lang.toLowerCase() === locale) || compatible[0];
+}
+
+function outputHasUnsupportedScript(text: string, language: ResponseLanguage): boolean {
+  const hasHan = /[\u3400-\u4dbf\u4e00-\u9fff]/u.test(text);
+  const hasKana = /[\u3040-\u30ff]/u.test(text);
+  if (language === 'ja') return hasHan && !hasKana;
+  return hasHan || hasKana;
 }
 
 export function speak(opts: TTSOptions): void {
   if (!isTTSSupported() || !opts.text.trim()) {
+    opts.onEnd?.();
+    return;
+  }
+  if (outputHasUnsupportedScript(opts.text, opts.language)) {
+    opts.onError?.('response_language_mismatch');
     opts.onEnd?.();
     return;
   }
@@ -222,7 +232,7 @@ export function speak(opts: TTSOptions): void {
 
   const utter = new SpeechSynthesisUtterance(opts.text);
   // Prefer voiceLanguage (BCP-47 from Settings) over the response language locale
-  utter.lang = opts.voiceLanguage || localeFor(opts.language);
+  utter.lang = safeVoiceLocale(opts.voiceLanguage, opts.language);
   utter.rate = opts.rate ?? 1.0;
   utter.pitch = opts.pitch ?? 1.0;
   utter.volume = 1.0;
@@ -232,6 +242,7 @@ export function speak(opts: TTSOptions): void {
 
   utter.onstart = () => {
     if (generation !== speechGeneration) return;
+    window.dispatchEvent(new Event('alisha:tts-start'));
     opts.onStart?.();
   };
   // Web Speech does not expose its rendered audio stream to Web Audio.
