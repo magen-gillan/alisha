@@ -31,10 +31,10 @@ export default function StatusBar({
     label = isAr ? 'أستمع…' : isJa ? '聞いています…' : 'Listening…';
     color = 'text-rose-300';
   } else if (thinking) {
-    label = isAr ? '…' : isJa ? '…' : '…';
+    label = isAr ? 'أفكر…' : isJa ? '考え中…' : 'Thinking…';
     color = 'text-blue-300';
   } else if (speaking) {
-    label = isAr ? '…' : isJa ? '…' : '…';
+    label = isAr ? 'أتحدث…' : isJa ? '話しています…' : 'Speaking…';
     color = 'text-purple-300';
   }
 

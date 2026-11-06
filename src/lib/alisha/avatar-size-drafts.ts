@@ -51,3 +51,18 @@ export function saveAvatarCalibrationDraft(avatarId: AvatarId, calibration: Avat
     return false;
   }
 }
+
+
+/** Delete any saved size/position for an avatar (returns true if deleted). */
+export function deleteAvatarCalibrationDraft(avatarId: AvatarId): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '{}');
+    const drafts = parsed && typeof parsed === 'object' ? { ...(parsed as Record<string, unknown>) } : {};
+    delete drafts[avatarId];
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(drafts));
+    return true;
+  } catch {
+    return false;
+  }
+}

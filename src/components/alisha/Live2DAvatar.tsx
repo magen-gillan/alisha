@@ -259,9 +259,14 @@ function AvatarInstance({
           const mw = internal?.originalWidth || modelRef.current.originalWidth || internal?.canvasWidth || 1024;
           const mh = internal?.originalHeight || modelRef.current.originalHeight || internal?.canvasHeight || 1024;
 
-          // Scale to fit the container while keeping aspect ratio.
-          // Use 0.95 multiplier so the model has a small margin.
-          const scale = Math.min(cw / mw, ch / mh) * 0.95 * scaleRef.current;
+          // Portrait-aware fit: on tall phone screens the character fills most
+          // of the container's height (matching the large framing the user drew)
+          // rather than being width-constrained into a tiny center figurine.
+          const isPortrait = ch > cw;
+          const baseScale = isPortrait
+            ? Math.min((ch / mh) * 1.05, (cw / mw) * 1.6)
+            : Math.min(cw / mw, ch / mh) * 0.95;
+          const scale = baseScale * scaleRef.current;
           try { modelRef.current.scale.set(scale); } catch {}
           // User offsets are normalized to the viewport so they remain useful
           // across phone sizes and are reapplied after every viewport resize.

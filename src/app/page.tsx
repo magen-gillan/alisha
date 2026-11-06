@@ -9,7 +9,7 @@ import StatusBar from '@/components/alisha/StatusBar';
 import AlishaErrorBoundary from '@/components/alisha/AlishaErrorBoundary';
 import { Button } from '@/components/ui/button';
 import { Settings, Loader2 } from 'lucide-react';
-import { readAvatarCalibrationDraft, saveAvatarCalibrationDraft } from '@/lib/alisha/avatar-size-drafts';
+import { readAvatarCalibrationDraft, saveAvatarCalibrationDraft, deleteAvatarCalibrationDraft } from '@/lib/alisha/avatar-size-drafts';
 import { getAvatarById } from '@/lib/alisha/avatars';
 import { useAlishaStore } from '@/store/alisha-store';
 import { stopSpeaking } from '@/lib/alisha/speech';
@@ -96,6 +96,13 @@ export default function Home() {
       const next = (current ?? baseline) * factor;
       return Math.max(baseline * 0.4, Math.min(baseline * 8, next));
     });
+    setSizeSaved(false);
+    setSaveFailed(false);
+  };
+  const resetAvatarCalibration = () => {
+    setAvatarScale(getAvatarById(avatarId).calibration.scale);
+    setAvatarPosition({ x: 0, y: 0 });
+    deleteAvatarCalibrationDraft(avatarId);
     setSizeSaved(false);
     setSaveFailed(false);
   };
@@ -284,6 +291,9 @@ export default function Home() {
                 setSaveFailed(!ok);
               }} className="bg-fuchsia-600 text-white hover:bg-fuchsia-700" aria-label="حفظ حجم وموضع الأفاتار على هذا الجهاز">
                 حفظ الضبط
+              </Button>
+              <Button size="sm" variant="ghost" onClick={resetAvatarCalibration} aria-label="إعادة ضبط حجم وموضع الأفاتار إلى الحجم الأصلي" className="h-8 px-2 text-xs text-white/80 hover:bg-white/15">
+                إعادة الضبط
               </Button>
             </div>
             <span className="rounded bg-black/55 px-2 py-1 text-[10px] text-white">

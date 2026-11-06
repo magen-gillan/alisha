@@ -41,7 +41,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Cubism 4 Sample',
     emoji: '👧',
     thumbnailUrl: '/live2d/thumbnails/kei-gallery.webp',
-    calibration: { scale: 1, xOffset: 0, yOffset: 0 },
+    calibration: { scale: 1.15, xOffset: 0, yOffset: 0 },
     moc3Version: 5,
   },
   {

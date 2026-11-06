@@ -123,7 +123,7 @@ export function buildProviderList(modelsByProvider: Record<string, string[]> = {
 
 function isChatModelId(id: string): boolean {
   const value = id.toLowerCase();
-  return !/(embedding|embed-|transcri|\btts\b|text-to-speech|audio|realtime|dall-e|gpt-image|moderation|whisper|rerank|ocr|asr|speech|video|computer-use|deep-research|\btts\b)/i.test(value);
+  return !/(embedding|embed-|transcri|\btts\b|text-to-speech|audio|realtime|dall-e|gpt-image|imagen|moderation|whisper|rerank|ocr|asr|speech|video|computer-use|deep-research|robotics|\btts\b)/i.test(value);
 }
 
 function unwrapModelRows(data: any): any[] {
@@ -163,7 +163,7 @@ function normalizeModelRows(rows: any[], providerId: string): Array<{ id: string
   for (const model of normalized) unique.set(model.id, model);
   const result = [...unique.values()];
   if (providerId === 'google') {
-    const preferred = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+    const preferred = ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-flash-lite-latest'];
     result.sort((a, b) => {
       const ai = preferred.indexOf(a.id);
       const bi = preferred.indexOf(b.id);
@@ -271,13 +271,14 @@ export async function getSelectedProvider(providerId: string, modelId: string): 
   const status = (await listProviderStatuses({ providerId }))[0];
   if (!status || !status.models.some((model) => model.id === modelId)) return null;
   const provider = buildProviderList({ [providerId]: status.models.map((model) => model.id) })
-    .find((item) => item.id === providerId);
-  if (!provider) return null;
-  if (provider.anonymous) return provider;
-  const eligibleKeys = modelKeyCache.get(providerId)?.get(modelId);
-  if (!eligibleKeys?.length) return null;
-  const eligibleIndexes = provider.apiKeyNames
-    .map((name, index) => eligibleKeys.includes(name) ? index : -1)
+   .find((item) => item.id === providerId);
+ if (!provider) return null;
+ if (provider.anonymous) return provider;
+  const eligibleKeys = modelKeyCache.get(providerId)?.get(modelId)
+    ?? provider.apiKeyNames.filter((name) => isVerifiedForKey(providerId, name, modelId));
+ if (!eligibleKeys?.length) return null;
+ const eligibleIndexes = provider.apiKeyNames
+   .map((name, index) => eligibleKeys.includes(name) ? index : -1)
     .filter((index) => index >= 0);
   return {
     ...provider,
@@ -332,7 +333,9 @@ export async function routeChat(
     const keys: Array<string | undefined> = provider.apiKeys.length ? provider.apiKeys : [undefined];
     let retryMs = 30_000;
     let rateLimited = false;
-    const modernOpenAIModel = provider.id === 'openai' && /^(gpt-5|o1|o3)(-|$)/i.test(model);
+    const modernOpenAIModel =
+      (provider.id === 'openai' && /^(gpt-5|gpt-6|o1|o3|o4)(-|$)/i.test(model)) ||
+      (provider.id === 'openrouter' && /^openai\/(gpt-5|gpt-6|o1|o3|o4)(-|$)/i.test(model));
 
     for (const apiKey of keys) {
       try {
@@ -341,6 +344,10 @@ export async function routeChat(
           // Google uses x-goog-api-key for its native REST catalog endpoint,
           // but its OpenAI-compatible Chat Completions endpoint requires Bearer.
           headers.Authorization = `Bearer ${apiKey}`;
+        }
+        if (provider.id === 'openrouter') {
+          headers['HTTP-Referer'] = 'https://alisha-puce.vercel.app';
+          headers['X-Title'] = 'Alisha';
         }
         const payload: Record<string, unknown> = {
           model,

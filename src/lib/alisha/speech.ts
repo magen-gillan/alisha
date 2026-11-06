@@ -208,7 +208,7 @@ function pickVoice(
 function outputHasUnsupportedScript(text: string, language: ResponseLanguage): boolean {
   const hasHan = /[\u3400-\u4dbf\u4e00-\u9fff]/u.test(text);
   const hasKana = /[\u3040-\u30ff]/u.test(text);
-  if (language === 'ja') return hasHan && !hasKana;
+  if (language === 'ja') return false;
   return hasHan || hasKana;
 }
 

@@ -1,19 +1,22 @@
 # نتائج اختبار مفاتيح وموديلات Alisha
 
-وقت الاختبار: 6 نوفمبر 2026. أُرسل طلب دردشة صغير لكل موديل مرشح من كتالوج المفتاح المعني، بحد أقصى 16 رمز إخراج. لا يحتوي هذا الملف أو التطبيق على قيم المفاتيح أو أجسام أخطاء المزودين. النموذج لا يظهر في Alisha إلا إذا نجح طلب الدردشة نفسه، ويُربط بخانة المفتاح التي نجحت معه.
+وقت الاختبار: 6 نوفمبر 2026. أُرسلت طلبات دردشة فعلية لكل موديل مرشح من كتالوج المفتاح المعني. لا يحتوي هذا الملف أو التطبيق على قيم المفاتيح أو نصوص أخطاء المزودين. **النموذج لا يظهر في Alisha إلا إذا نجح طلب الدردشة نفسه**.
 
-| المزود / خانة المفتاح | اختُبر | اجتاز | لم يجتز | مؤقت/غير محسوم |
-|---|---:|---:|---:|---:|
-| Google Gemini · `GEMINI_API_KEY_2` | 37 | 10 | 6 | 21 |
-| OpenAI · `OPENAI_API_KEY` | 50 | 0 | 2 | 48 |
-| OpenRouter · `OPENROUTER_API_KEY` | 450 | 0 | 450 | 0 |
-| OpenRouter · `OPENROUTER_API_KEY_2` | 414 | 348 | 61 | 5 |
-| Hugging Face · `HUGGINGFACE_API_KEY` | 126 | 0 | 126 | 0 |
-| Z.ai / GLM · `ZAI_API_KEY` | 12 | 0 | 0 | 12 |
-| Pollinations · بلا مفتاح | 1 | 1 | 0 | 0 |
+| المزود / خانة المفتاح | اختُبر | اجتاز | لم يجتز | مؤقت/غير محسوم | الحالة |
+|---|---:|---:|---:|---:|---|
+| Google Gemini · `GEMINI_API_KEY_2` | 47 | 7 | 25 | 15 | صالح — 7 موديلات flash مجتازة |
+| OpenAI · `OPENAI_API_KEY` | 50 | 0 | 50 | 0 | صالح لكن بلا رصيد (insufficient_quota) |
+| OpenRouter · `OPENROUTER_API_KEY` | 414 | 0 | 414 | 0 | مفتاح إدارة (management key — غير مؤهل للدردشة) |
+| OpenRouter · `OPENROUTER_API_KEY_2` | 414 | 213 | 196 | 5 | صالح — رصيد متبقٍ ~$99.85 USD |
+| Hugging Face · `HUGGINGFACE_API_KEY` | 126 | 0 | 126 | 0 | صالح لكن يتطلب اشتراك PRO أو رصيد مسبق الدفع (402) |
+| Z.ai / GLM · `ZAI_API_KEY` | 12 | 0 | 12 | 0 | صالح لكن بلا رصيد كافٍ (1113) |
+| Pollinations · بلا مفتاح | 5 | 2 | 3 | 0 | متاح مجاناً (`openai-fast`, `openai`) |
 
-الموديلات التي اجتازت الاختبار فقط موجودة في `src/lib/alisha/verified-models.json`. القائمة الحالية تشمل 10 موديلات Google، و348 موديلًا لمفتاح OpenRouter الثاني، و`openai-fast` من Pollinations. تعذّر تأكيد بعض النتائج بسبب 429/5xx، فتبقى مخفية بدل عرض موديلات غير مؤكدة. بقيت المفاتيح التي لم تجتز في إعدادات الخادم كما هي؛ لم تُحذف، ولم تُستخدم لإظهار نماذج غير مجتازة.
+الموديلات التي اجتازت الاختبار فقط موجودة في `src/lib/alisha/verified-models.json`. القائمة الحالية تشمل:
+- **7 موديلات Google Gemini**: `gemini-3-flash-preview`، `gemini-3.1-flash-lite`، `gemini-3.1-flash-lite-preview`، `gemini-3.5-flash`، `gemini-3.5-flash-lite`، `gemini-3.6-flash`، `gemini-flash-lite-latest`. (الموديلات القديمة `gemini-2.5-*` ألغيت، و`gemini-3.7/3.8-flash` تحت ضغط طلب عالي مؤقت 503).
+- **213 موديلاً لـ OpenRouter** تعمل مع `OPENROUTER_API_KEY_2`، من بينها GPT-4o و Claude 5 و DeepSeek و Grok و Mistral و Llama و Kimi.
+- **2 موديل Pollinations**: `openai-fast` و `openai` (مجاني دون مفتاح).
 
-أظهرت صفحة الإعدادات حالة الموديلات المعتمدة وعدد خانات المفاتيح ذات موديلات مجتازة، وتعرض فقط الموديلات الموثقة. `GET /api/providers` و`GET /api/chat` لا يعيدان حقول المفاتيح أو قيمها. يختار مسار الدردشة المفتاح الذي اجتاز اختبار الموديل تحديدًا.
+بقيت المفاتيح الأخرى في إعدادات الخادم كما هي ولم تُحذف، وستعرض موديلاتها تلقائياً بمجرد شحن الرصيد وإعادة الاختبار.
 
-استخدم Gemini ترويسة Bearer على endpoint المتوافق مع OpenAI للدردشة، بينما يظل `x-goog-api-key` مستخدمًا لقراءة كتالوج Gemini الأصلي. المراجع الرسمية: [Gemini OpenAI compatibility](https://ai.google.dev/gemini-api/docs/openai) و[Gemini API reference](https://ai.google.dev/api).
+المراجع الرسمية: [Gemini OpenAI compatibility](https://ai.google.dev/gemini-api/docs/openai)، [Gemini API reference](https://ai.google.dev/api)، [OpenRouter](https://openrouter.ai).
