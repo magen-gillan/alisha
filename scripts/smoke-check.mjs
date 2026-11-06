@@ -8,6 +8,10 @@ async function check(path, expected = 200) {
 
 await check('/');
 await check('/alisha-new-icon.png');
+await check('/avatar-studio', 404);
+for (const file of ['kei-gallery.webp', 'jane-gallery.webp', 'ganyu-gallery.webp', 'miara-gallery.webp']) {
+  await check(`/live2d/thumbnails/${file}`);
+}
 for (const file of ['aurora.webp', 'sakura.webp', 'moonlit.webp', 'cloudroom.webp']) {
   await check(`/backgrounds/${file}`);
 }

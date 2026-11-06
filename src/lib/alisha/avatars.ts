@@ -23,6 +23,8 @@ export interface AvatarModel {
   emoji?: string;
   /** Optional thumbnail image URL (small preview shown in the picker). */
   thumbnailUrl?: string;
+  /** Fixed display calibration, applied by the renderer and not user-editable. */
+  calibration: { scale: number; xOffset: number; yOffset: number };
   /**
    * MOC3 format version this model uses. The bundled Cubism Core
    * (v5, 2024+) supports versions 1-5. Older cores (2019) only support
@@ -38,7 +40,8 @@ export const AVATAR_MODELS: AvatarModel[] = [
     modelUrl: '/live2d/alisha/kei_basic_free.model3.json',
     description: 'Cubism 4 Sample',
     emoji: '👧',
-    thumbnailUrl: '/live2d/thumbnails/kei.png',
+    thumbnailUrl: '/live2d/thumbnails/kei-gallery.webp',
+    calibration: { scale: 1, xOffset: 0, yOffset: 0 },
     moc3Version: 5,
   },
   {
@@ -47,7 +50,8 @@ export const AVATAR_MODELS: AvatarModel[] = [
     modelUrl: '/live2d/jane/jane.model3.json',
     description: 'Chinese-style avatar',
     emoji: '🧝',
-    thumbnailUrl: '/live2d/thumbnails/jane.png',
+    thumbnailUrl: '/live2d/thumbnails/jane-gallery.webp',
+    calibration: { scale: 2, xOffset: 16, yOffset: 120 },
     moc3Version: 5,
   },
   {
@@ -57,6 +61,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Ice-themed avatar',
     emoji: '❄️',
     thumbnailUrl: '/live2d/thumbnails/icegirl.png',
+    calibration: { scale: 1.25, xOffset: 0, yOffset: 0 },
     moc3Version: 4,
   },
   {
@@ -65,7 +70,8 @@ export const AVATAR_MODELS: AvatarModel[] = [
     modelUrl: '/live2d/ganyu/ganyu.model3.json',
     description: 'Genshin Impact style',
     emoji: '🐉',
-    thumbnailUrl: '/live2d/thumbnails/ganyu.png',
+    thumbnailUrl: '/live2d/thumbnails/ganyu-gallery.webp',
+    calibration: { scale: 1.3, xOffset: 0, yOffset: 0 },
     moc3Version: 4,
   },
   {
@@ -74,7 +80,8 @@ export const AVATAR_MODELS: AvatarModel[] = [
     modelUrl: '/live2d/miara/miara_pro_t03.model3.json',
     description: 'Pro avatar with motions',
     emoji: '✨',
-    thumbnailUrl: '/live2d/thumbnails/miara.png',
+    thumbnailUrl: '/live2d/thumbnails/miara-gallery.webp',
+    calibration: { scale: 1.35, xOffset: 30, yOffset: 4 },
     moc3Version: 3,
   },
 ];

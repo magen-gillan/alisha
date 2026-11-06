@@ -13,7 +13,7 @@
  * (Live2D, pixi.js) to keep install fast.
  */
 
-const CACHE_VERSION = 'alisha-v1';
+const CACHE_VERSION = 'alisha-v2';
 const PRECACHE_URLS = [
   '/',
   '/alisha-new-icon.png',

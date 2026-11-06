@@ -8,7 +8,7 @@ import SettingsPanel from '@/components/alisha/SettingsPanel';
 import StatusBar from '@/components/alisha/StatusBar';
 import AlishaErrorBoundary from '@/components/alisha/AlishaErrorBoundary';
 import { Button } from '@/components/ui/button';
-import { Settings, Loader2, Sliders } from 'lucide-react';
+import { Settings, Loader2 } from 'lucide-react';
 import { useAlishaStore } from '@/store/alisha-store';
 import { stopSpeaking } from '@/lib/alisha/speech';
 import { cancelChatRequests } from '@/lib/alisha/chat-request';
@@ -83,8 +83,8 @@ export default function Home() {
   // TextChatButton can trigger emotion changes when the AI responds.
   const setEmotionRef = useRef<((emotion: Emotion) => void) | null>(null);
 
-  // Touch gestures: swipe horizontally to cycle backgrounds, pinch to zoom.
-  const { pinchScale } = useTouchGestures({
+  // Horizontal swipes cycle backgrounds; avatar size is fixed per model.
+  useTouchGestures({
     onSwipeLeft: () => setBackground(prevBackground(background)),
     onSwipeRight: () => setBackground(nextBackground(background)),
   });
@@ -177,16 +177,6 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-1">
-          <a href="/avatar-studio" aria-label="Avatar Studio">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/10"
-              aria-label="Avatar Studio"
-            >
-              <Sliders className="w-5 h-5" />
-            </Button>
-          </a>
           <ThemeToggle theme={theme} onToggle={setTheme} />
           <Button
             variant="ghost"
@@ -204,7 +194,6 @@ export default function Home() {
       <section className="relative z-10 flex-1 flex items-center justify-center min-h-0 overflow-hidden">
         <div
           className="relative w-full h-full max-w-[min(95vw,42rem)] max-h-[min(85vh,42rem)] mx-auto flex items-center justify-center"
-          style={{ transform: `scale(${pinchScale})` }}
         >
           <AlishaErrorBoundary label="Avatar">
             <Suspense fallback={<AvatarFallback />}>

@@ -247,12 +247,12 @@ function AvatarInstance({
 
           // Scale to fit the container while keeping aspect ratio.
           // Use 0.95 multiplier so the model has a small margin.
-          const scale = Math.min(cw / mw, ch / mh) * 0.95;
+          const scale = Math.min(cw / mw, ch / mh) * 0.95 * avatar.calibration.scale;
           try { modelRef.current.scale.set(scale); } catch {}
-          // Position: center of container
+          // Fixed per-avatar offsets are reapplied after every viewport resize.
           try {
-            modelRef.current.x = cw / 2;
-            modelRef.current.y = ch / 2;
+            modelRef.current.x = cw / 2 + avatar.calibration.xOffset;
+            modelRef.current.y = ch / 2 + avatar.calibration.yOffset;
           } catch {}
         };
 
