@@ -13,8 +13,6 @@ export interface ChatMessage {
 }
 
 interface AlishaStore extends AlishaSettings {
-  /** Provider keys for the unified LLM router (from FreeLLMAPI integration). */
-  providerKeys: Record<string, string>;
   /** Permanent memory — instructions injected into every request. */
   permanentMemory: string;
   /** Voice language for TTS (BCP-47, e.g. ar-SA, ja-JP, en-US). */
@@ -28,9 +26,8 @@ interface AlishaStore extends AlishaSettings {
   setBackground: (bg: BackgroundId) => void;
   setAvatarId: (id: AvatarId) => void;
   setTheme: (theme: AppTheme) => void;
-  setProviderKeys: (keys: Record<string, string>) => void;
-  updateProviderKey: (providerId: string, key: string) => void;
-  removeProviderKey: (providerId: string) => void;
+  setProviderId: (providerId: string) => void;
+  setModel: (model: string) => void;
   setSpeechRate: (rate: number) => void;
   setSpeechPitch: (pitch: number) => void;
   setPermanentMemory: (text: string) => void;
@@ -57,7 +54,6 @@ const DEFAULT_PERMANENT_MEMORY = `# ذاكرة دائمة — تعليمات ل�
 - لا تكشف أبداً أنك نموذج لغوي أو ذكاء اصطناعي.`;
 
 const DEFAULTS: AlishaSettings & {
-  providerKeys: Record<string, string>;
   permanentMemory: string;
   voiceLanguage: string;
   voiceURI: string;
@@ -68,7 +64,7 @@ const DEFAULTS: AlishaSettings & {
   avatarId: 'kei',
   theme: 'dark',
   model: '',
-  providerKeys: {},
+  providerId: 'google',
   speechRate: 1.0,
   speechPitch: 1.0,
   permanentMemory: DEFAULT_PERMANENT_MEMORY,
@@ -89,17 +85,8 @@ export const useAlishaStore = create<AlishaStore>()(
       setBackground: (bg) => set({ background: bg }),
       setAvatarId: (id) => set({ avatarId: id }),
       setTheme: (theme) => set({ theme }),
-      setProviderKeys: (keys) => set({ providerKeys: keys }),
-      updateProviderKey: (providerId, key) =>
-        set((state) => ({
-          providerKeys: { ...state.providerKeys, [providerId]: key },
-        })),
-      removeProviderKey: (providerId) =>
-        set((state) => {
-          const keys = { ...state.providerKeys };
-          delete keys[providerId];
-          return { providerKeys: keys };
-        }),
+      setProviderId: (providerId) => set({ providerId, model: '' }),
+      setModel: (model) => set({ model }),
       setSpeechRate: (rate) => set({ speechRate: rate }),
       setSpeechPitch: (pitch) => set({ speechPitch: pitch }),
       setPermanentMemory: (text) => set({ permanentMemory: text }),
@@ -127,21 +114,20 @@ export const useAlishaStore = create<AlishaStore>()(
       reset: () =>
         set({
           ...DEFAULTS,
-          providerKeys: {},
           conversation: [],
           permanentMemory: DEFAULT_PERMANENT_MEMORY,
         }),
     }),
     {
       name: 'alisha-settings',
-      version: 12,
+      version: 13,
       partialize: (state) => ({
         responseLanguage: state.responseLanguage,
         background: state.background,
         avatarId: state.avatarId,
         theme: state.theme,
         model: state.model,
-        providerKeys: state.providerKeys,
+        providerId: state.providerId,
         speechRate: state.speechRate,
         speechPitch: state.speechPitch,
         permanentMemory: state.permanentMemory,
@@ -171,8 +157,16 @@ export const useAlishaStore = create<AlishaStore>()(
             persisted.voiceURI = '';
           }
         }
+        if (version < 13) {
+          // Provider secrets are server-managed now; discard any browser copies.
+          delete persisted.providerKeys;
+          delete persisted.apiKey;
+          delete persisted.pollinationsApiKey;
+          persisted.providerId = 'google';
+        }
         // Ensure new fields exist
         if (typeof persisted.model !== 'string') persisted.model = '';
+        if (typeof persisted.providerId !== 'string') persisted.providerId = 'google';
         return persisted;
       },
     }

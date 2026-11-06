@@ -12,6 +12,7 @@ interface Live2DAvatarProps {
   listening: boolean;
   thinking: boolean;
   avatarId: AvatarId;
+  scale: number;
   onEmotionReady?: (setEmotion: (emotion: Emotion) => void) => void;
 }
 
@@ -37,6 +38,7 @@ export default function Live2DAvatar({
   listening,
   thinking,
   avatarId,
+  scale,
   onEmotionReady,
 }: Live2DAvatarProps) {
   return (
@@ -47,6 +49,7 @@ export default function Live2DAvatar({
       listening={listening}
       thinking={thinking}
       avatarId={avatarId}
+      scale={scale}
       onEmotionReady={onEmotionReady}
     />
   );
@@ -58,6 +61,7 @@ function AvatarInstance({
   listening,
   thinking,
   avatarId,
+  scale,
   onEmotionReady,
 }: Live2DAvatarProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -65,6 +69,7 @@ function AvatarInstance({
   const pixiAppRef = useRef<any>(null);
   const modelRef = useRef<any>(null);
   const fitModelRef = useRef<(() => void) | null>(null);
+  const scaleRef = useRef(scale);
   const [loadState, setLoadState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
   const [errorMsg, setErrorMsg] = useState<string>('');
 
@@ -247,7 +252,7 @@ function AvatarInstance({
 
           // Scale to fit the container while keeping aspect ratio.
           // Use 0.95 multiplier so the model has a small margin.
-          const scale = Math.min(cw / mw, ch / mh) * 0.95 * avatar.calibration.scale;
+          const scale = Math.min(cw / mw, ch / mh) * 0.95 * scaleRef.current;
           try { modelRef.current.scale.set(scale); } catch {}
           // Fixed per-avatar offsets are reapplied after every viewport resize.
           try {
@@ -444,6 +449,10 @@ function AvatarInstance({
     };
   }, [avatarId]);
 
+  useEffect(() => {
+    scaleRef.current = scale;
+    fitModelRef.current?.();
+  }, [scale]);
   // ---- State-based motion triggers ----
   useEffect(() => {
     if (loadState !== 'ready' || !modelRef.current) return;
@@ -495,7 +504,8 @@ function AvatarInstance({
     <div
       ref={containerRef}
       onClick={handleTap}
-      className="relative w-full h-full flex items-center justify-center overflow-hidden cursor-pointer"
+      data-avatar-calibration
+      className="relative w-full h-full flex items-center justify-center overflow-hidden cursor-pointer touch-none"
       aria-label="Alisha avatar"
       role="button"
       tabIndex={0}

@@ -9,6 +9,8 @@ import StatusBar from '@/components/alisha/StatusBar';
 import AlishaErrorBoundary from '@/components/alisha/AlishaErrorBoundary';
 import { Button } from '@/components/ui/button';
 import { Settings, Loader2 } from 'lucide-react';
+import { readAvatarSizeDraft, saveAvatarSizeDraft } from '@/lib/alisha/avatar-size-drafts';
+import { getAvatarById } from '@/lib/alisha/avatars';
 import { useAlishaStore } from '@/store/alisha-store';
 import { stopSpeaking } from '@/lib/alisha/speech';
 import { cancelChatRequests } from '@/lib/alisha/chat-request';
@@ -76,6 +78,9 @@ export default function Home() {
   const [speaking, setSpeaking] = useState(false);
   const [listening, setListening] = useState(false);
   const [thinking, setThinking] = useState(false);
+  const [avatarScale, setAvatarScale] = useState<number | null>(null);
+  const [sizeSaved, setSizeSaved] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const { background, responseLanguage, avatarId, setBackground, theme, setTheme } = useAlishaStore();
   const viewportHeight = useVisualViewportHeight();
 
@@ -83,11 +88,30 @@ export default function Home() {
   // TextChatButton can trigger emotion changes when the AI responds.
   const setEmotionRef = useRef<((emotion: Emotion) => void) | null>(null);
 
-  // Horizontal swipes cycle backgrounds; avatar size is fixed per model.
+  const adjustAvatarScale = (factor: number) => {
+    const baseline = getAvatarById(avatarId).calibration.scale;
+    setAvatarScale((current) => {
+      const next = (current ?? baseline) * factor;
+      return Math.max(baseline * 0.4, Math.min(baseline * 4, next));
+    });
+    setSizeSaved(false);
+    setSaveFailed(false);
+  };
+
+  // Horizontal swipes cycle backgrounds; pinches adjust only the selected avatar.
   useTouchGestures({
     onSwipeLeft: () => setBackground(prevBackground(background)),
     onSwipeRight: () => setBackground(nextBackground(background)),
+    onPinch: adjustAvatarScale,
   });
+  // Selection loads this avatar's local saved size; otherwise use static baseline.
+  useEffect(() => {
+    // Intentional client-only hydration from device-local storage on selection.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAvatarScale(readAvatarSizeDraft(avatarId) ?? getAvatarById(avatarId).calibration.scale);
+    setSizeSaved(false);
+    setSaveFailed(false);
+  }, [avatarId]);
 
   // Apply theme class to <html> so global CSS variables can react.
   useEffect(() => {
@@ -193,12 +217,14 @@ export default function Home() {
       {/* Avatar area — centered, large, fills available space */}
       <section className="relative z-10 flex-1 flex items-center justify-center min-h-0 overflow-hidden">
         <div
-          className="relative w-full h-full max-w-[min(95vw,42rem)] max-h-[min(85vh,42rem)] mx-auto flex items-center justify-center"
+          data-avatar-calibration
+          className="relative w-full h-full max-w-[min(95vw,42rem)] max-h-[min(85vh,42rem)] mx-auto flex items-center justify-center touch-none"
         >
           <AlishaErrorBoundary label="Avatar">
             <Suspense fallback={<AvatarFallback />}>
               <Live2DAvatar
                 background={background}
+                scale={avatarScale ?? getAvatarById(avatarId).calibration.scale}
                 speaking={speaking}
                 listening={listening}
                 thinking={thinking}
@@ -207,6 +233,26 @@ export default function Home() {
               />
             </Suspense>
           </AlishaErrorBoundary>
+          {/* Device-local calibration controls; values are drafts until saved here. */}
+          <div className="absolute top-2 right-2 z-30 flex flex-col items-end gap-1">
+            <div className="flex items-center gap-1 rounded-lg bg-black/55 p-1 shadow-lg">
+              <Button size="sm" variant="ghost" onClick={() => adjustAvatarScale(0.9)} aria-label="تصغير الأفاتار" className="h-8 min-w-8 px-2 text-lg text-white hover:bg-white/15">−</Button>
+              <span className="min-w-12 text-center text-xs text-white">
+                {((avatarScale ?? getAvatarById(avatarId).calibration.scale) / getAvatarById(avatarId).calibration.scale).toFixed(1)}×
+              </span>
+              <Button size="sm" variant="ghost" onClick={() => adjustAvatarScale(1.1)} aria-label="تكبير الأفاتار" className="h-8 min-w-8 px-2 text-lg text-white hover:bg-white/15">+</Button>
+              <Button size="sm" onClick={() => {
+              const ok = saveAvatarSizeDraft(avatarId, avatarScale ?? getAvatarById(avatarId).calibration.scale);
+              setSizeSaved(ok);
+              setSaveFailed(!ok);
+            }} className="bg-fuchsia-600 text-white hover:bg-fuchsia-700" aria-label="حفظ حجم الأفاتار على هذا الجهاز">
+                حفظ الحجم
+              </Button>
+            </div>
+            <span className="rounded bg-black/55 px-2 py-1 text-[10px] text-white">
+              {saveFailed ? 'تعذر الحفظ على هذا الجهاز' : sizeSaved ? 'محفوظ على هذا الجهاز · مسودة مؤقتة' : 'حجم مؤقت · محلي فقط'}
+            </span>
+          </div>
           {/* Audio visualization overlay when Alisha is speaking */}
           {speaking && (
             <div className="pointer-events-none absolute inset-x-0 bottom-2 flex items-end justify-center gap-1 h-10 z-20" aria-hidden="true">

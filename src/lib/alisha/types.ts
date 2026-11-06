@@ -56,6 +56,8 @@ export interface AlishaSettings {
   theme: AppTheme;
   /** Selected model ID (optional — router picks automatically). */
   model: string;
+  /** Server-configured provider selected for chat requests. */
+  providerId: string;
   /** Speech rate for TTS (0.5 - 2.0). */
   speechRate: number;
   /** Speech pitch for TTS (0 - 2). */
@@ -83,6 +85,8 @@ export interface ChatRequest {
   userInput: string;
   detectedLanguage: ResponseLanguage;
   responseLanguage: ResponseLanguage;
+  /** The server-configured provider selected in Settings. */
+  providerId?: string;
   /** Model ID — optional; the router picks automatically if omitted. */
   model?: string;
   history?: { role: 'user' | 'model'; text: string }[];

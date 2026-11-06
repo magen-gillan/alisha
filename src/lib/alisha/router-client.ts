@@ -1,133 +1,90 @@
 'use client';
 
-/**
- * Unified LLM client — replaces gemini-client and pollinations-client.
- *
- * Uses the /api/chat/ endpoint which routes through the LLM router.
- * The router automatically tries multiple providers with failover.
- *
- * Provider keys are stored in localStorage under 'alisha-provider-keys'.
- * Format: { groq: "gsk_...", google: "AIza...", openrouter: "sk-or-..." }
- */
+/** Client wrapper for the server-side provider router. Secret keys never enter this module. */
 
 import type { ChatRequest, ChatResponse, ResponseLanguage } from './types';
 import { detectLanguage, systemInstructionFor } from './language';
 
 const API_BASE = '/api/chat/';
-const STORAGE_KEY = 'alisha-provider-keys';
+const PROVIDERS_API = '/api/providers';
 
-/** Get all provider keys from localStorage */
-export function getProviderKeys(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
+export interface RouterModel {
+  id: string;
+  name: string;
 }
 
-/** Save provider keys to localStorage */
-export function setProviderKeys(keys: Record<string, string>): void {
+export interface RouterProviderStatus {
+  id: string;
+  name: string;
+  status: 'available' | 'valid' | 'partial' | 'invalid' | 'unavailable';
+  keyCount: number;
+  validKeyCount: number;
+  models: RouterModel[];
+}
+
+/** Remove the former standalone localStorage copy of provider secrets. */
+export function clearLegacyProviderKeys(): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(keys));
+  try {
+    window.localStorage.removeItem('alisha-provider-keys');
+  } catch {
+    // Storage may be disabled; the application no longer reads or sends these values.
+  }
 }
 
-/** Check if any provider key is set */
-export function hasAnyKey(): boolean {
-  const keys = getProviderKeys();
-  return Object.values(keys).some(k => k && k.trim());
+export async function listRouterProviders(options: { providerId?: string; force?: boolean } = {}): Promise<RouterProviderStatus[]> {
+  clearLegacyProviderKeys();
+  const query = new URLSearchParams();
+  if (options.providerId) query.set('provider', options.providerId);
+  if (options.force) query.set('refresh', '1');
+  const suffix = query.size ? `?${query.toString()}` : '';
+  const response = await fetch(`${PROVIDERS_API}${suffix}`, { cache: 'no-store' });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.error?.message || `Provider check failed (HTTP ${response.status}).`);
+  return Array.isArray(data?.providers) ? data.providers : [];
 }
 
-/**
- * Chat with the unified LLM router.
- * Works exactly like chatWithGemini / chatWithPollinations but routes
- * through all available providers automatically.
- */
 export async function chatWithRouter(req: ChatRequest): Promise<ChatResponse> {
-  if (!req.userInput?.trim()) {
-    throw new Error('userInput is required.');
-  }
-  if (req.userInput.length > 8000) {
-    throw new Error('الرسالة طويلة جداً. الحد الأقصى 8000 حرف.');
-  }
+  clearLegacyProviderKeys();
+  if (!req.userInput?.trim()) throw new Error('userInput is required.');
+  if (req.userInput.length > 8000) throw new Error('الرسالة طويلة جداً. الحد الأقصى 8000 حرف.');
 
-  const responseLanguage: ResponseLanguage = ['en', 'ar', 'ja'].includes(
-    req.responseLanguage as ResponseLanguage
-  )
+  const responseLanguage: ResponseLanguage = ['en', 'ar', 'ja'].includes(req.responseLanguage as ResponseLanguage)
     ? req.responseLanguage
     : 'en';
-
   const detected = detectLanguage(req.userInput);
-
-  // Build OpenAI-compatible messages
-  const permMem = (req.permanentMemory || '').trim();
-  const langInstr = systemInstructionFor(responseLanguage);
-  const systemText = permMem ? `${permMem}\n\n---\n\n${langInstr}` : langInstr;
+  const permanentMemory = (req.permanentMemory || '').trim();
+  const languageInstruction = systemInstructionFor(responseLanguage);
+  const systemText = permanentMemory ? `${permanentMemory}\n\n---\n\n${languageInstruction}` : languageInstruction;
 
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
-  if (systemText) {
-    messages.push({ role: 'system', content: systemText });
-  }
-  for (const m of req.history ?? []) {
-    messages.push({
-      role: m.role === 'model' ? 'assistant' : 'user',
-      content: m.text,
-    });
+  if (systemText) messages.push({ role: 'system', content: systemText });
+  for (const message of req.history ?? []) {
+    messages.push({ role: message.role === 'model' ? 'assistant' : 'user', content: message.text });
   }
   messages.push({ role: 'user', content: req.userInput });
 
-  // Get provider keys from localStorage
-  const providerKeys = getProviderKeys();
-
-  const body = {
-    messages,
-    model: req.model,
-    temperature: 0.8,
-    max_tokens: 1024,
-    providerKeys,
-  };
-
-  const resp = await fetch(API_BASE, {
+  const response = await fetch(API_BASE, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      messages,
+      providerId: req.providerId,
+      model: req.model,
+      temperature: 0.7,
+      max_tokens: 700,
+    }),
     signal: req.signal,
   });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.error?.message || `Chat failed (HTTP ${response.status}).`);
 
-  const data = await resp.json();
-
-  if (!resp.ok) {
-    throw new Error(data?.error?.message || `Chat failed (HTTP ${resp.status}).`);
-  }
-
-  const text: string = data?.choices?.[0]?.message?.content?.toString().trim() || '';
-
-  if (!text) {
-    throw new Error('Empty response from LLM router.');
-  }
-
+  const text = data?.choices?.[0]?.message?.content?.toString().trim() || '';
+  if (!text) throw new Error('Empty response from LLM router.');
   return {
     text,
     detectedLanguage: detected,
     responseLanguage,
     model: data?.model || 'unknown',
   };
-}
-
-/**
- * List available models from the router.
- */
-export async function listRouterModels(): Promise<Array<{ id: string; provider: string; name: string }>> {
-  const providerKeys = getProviderKeys();
-  const headers: Record<string, string> = {};
-  if (Object.keys(providerKeys).length > 0) {
-    headers['x-provider-keys'] = JSON.stringify(providerKeys);
-  }
-
-  const resp = await fetch(API_BASE, { headers });
-  if (!resp.ok) return [];
-
-  const data = await resp.json();
-  return data?.models || data?.data || [];
 }

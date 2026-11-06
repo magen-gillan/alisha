@@ -40,6 +40,8 @@ export default function TextChatButton({
   const lastSubmittedTextRef = useRef<string>('');
   const {
     responseLanguage,
+    providerId,
+    model,
     speechRate,
     speechPitch,
     voiceLanguage,
@@ -105,6 +107,8 @@ export default function TextChatButton({
         userInput: text,
         detectedLanguage: detected,
         responseLanguage,
+        providerId,
+        model,
         history: buildHistory(historyRef.current),
         permanentMemory,
         signal: controller.signal,

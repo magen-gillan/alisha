@@ -22,4 +22,11 @@ const listing = await (await check('/api/chat')).json();
 if (!Array.isArray(listing.models) || !listing.models.some((model) => model.provider === 'Pollinations')) {
   throw new Error(`Expected the anonymous Pollinations route in /api/chat, got ${listing.models?.length ?? 0} model(s)`);
 }
-console.log(`Smoke check passed for ${base}: ${listing.models.length} chat model(s) are discoverable`);
+const statusData = await (await check('/api/providers')).json();
+if (!Array.isArray(statusData.providers)) throw new Error('Expected a provider status list from /api/providers');
+for (const provider of statusData.providers) {
+  if (!Array.isArray(provider.models) || 'apiKeys' in provider || 'key' in provider || 'apiKey' in provider) {
+    throw new Error(`Unsafe or malformed provider response: ${provider.id}`);
+  }
+}
+console.log(`Smoke check passed for ${base}: ${listing.models.length} chat model(s), ${statusData.providers.length} safe provider status(es)`);

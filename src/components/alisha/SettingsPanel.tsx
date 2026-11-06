@@ -14,24 +14,24 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useAlishaStore, DEFAULT_PERMANENT_MEMORY } from '@/store/alisha-store';
 import type { ResponseLanguage, BackgroundId } from '@/lib/alisha/types';
 import { LANGUAGE_LABELS, BACKGROUND_LABELS, VOICE_LANGUAGES, BACKGROUND_ORDER, nextBackground, prevBackground } from '@/lib/alisha/types';
 import { AVATAR_MODELS } from '@/lib/alisha/avatars';
-import { FREE_PROVIDERS, type LLMProvider } from '@/lib/alisha/llm-router';
-import { getProviderKeys, setProviderKeys, listRouterModels } from '@/lib/alisha/router-client';
+import { clearLegacyProviderKeys, listRouterProviders, type RouterProviderStatus } from '@/lib/alisha/router-client';
 import { shareOrDownload } from '@/lib/alisha/share';
 import CloseButton from '@/components/alisha/CloseButton';
 import {
   loadVoices, getVoicesForLanguage, safeVoiceLocale, speak, stopSpeaking,
 } from '@/lib/alisha/speech';
 import {
-  Loader2, RefreshCw, AlertCircle, Eye, EyeOff, ExternalLink,
-  KeyRound, User, Image as ImageIcon, Globe, Brain, MessagesSquare,
-  Volume2, Trash2, CheckCircle2, Save, Plus, X,
+  Loader2, RefreshCw, ChevronsUpDown,
+  User, Image as ImageIcon, Globe, Brain, MessagesSquare,
+  Volume2, Trash2, CheckCircle2, Save,
 } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -60,11 +60,11 @@ const voiceLocaleForResponse = (language: ResponseLanguage): string => {
 
 export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
   const {
-    responseLanguage, background, avatarId, theme,
+    responseLanguage, background, avatarId, theme, providerId, model,
     speechRate, speechPitch, permanentMemory, voiceLanguage, voiceURI,
-    conversation, providerKeys,
+    conversation,
     setResponseLanguage, setBackground, setAvatarId, setTheme,
-    setProviderKeys, updateProviderKey, removeProviderKey,
+    setProviderId, setModel,
     setSpeechRate, setSpeechPitch, setPermanentMemory,
     setVoiceLanguage, setVoiceURI, clearConversation,
   } = useAlishaStore();
@@ -72,9 +72,11 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
   const [activeTab, setActiveTab] = useState<'general' | 'keys'>('general');
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [previewingVoice, setPreviewingVoice] = useState(false);
-  const [routerModels, setRouterModels] = useState<Array<{ id: string; provider: string; name: string }>>([]);
+  const [providerStatuses, setProviderStatuses] = useState<RouterProviderStatus[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
-  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
+  const [checkingProviderId, setCheckingProviderId] = useState('');
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [providersLoaded, setProvidersLoaded] = useState(false);
   const [saved, setSaved] = useState(false);
   const allowedVoiceLanguage = safeVoiceLocale(voiceLanguage, responseLanguage);
 
@@ -82,36 +84,49 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     loadVoices().then(() => setVoices(getVoicesForLanguage(allowedVoiceLanguage)));
   }, [allowedVoiceLanguage, open]);
 
-  const fetchModels = async () => {
-    setLoadingModels(true);
+  useEffect(() => { clearLegacyProviderKeys(); }, []);
+
+  const fetchModels = async (force = false, onlyProviderId?: string) => {
+    if (onlyProviderId) setCheckingProviderId(onlyProviderId);
+    else setLoadingModels(true);
     try {
-      const list = await listRouterModels();
-      setRouterModels(list);
+      const list = await listRouterProviders({ providerId: onlyProviderId, force });
+      setProviderStatuses((current) => {
+        if (!onlyProviderId) return list;
+        const merged = new Map(current.map((provider) => [provider.id, provider]));
+        for (const provider of list) merged.set(provider.id, provider);
+        return [...merged.values()];
+      });
+      setProvidersLoaded(true);
+
+      const currentSettings = useAlishaStore.getState();
+      const isUsable = (provider: RouterProviderStatus) => ['valid', 'partial', 'available'].includes(provider.status);
+      const selected = list.find((provider) => provider.id === currentSettings.providerId && isUsable(provider))
+        || list.find(isUsable);
+      if (selected && ['valid', 'partial', 'available'].includes(selected.status)) {
+        if (selected.id !== currentSettings.providerId) {
+          setProviderId(selected.id);
+          setModel(selected.models[0]?.id || '');
+        } else if (!selected.models.some((item) => item.id === currentSettings.model) && selected.models[0]) {
+          setModel(selected.models[0].id);
+        }
+      }
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to list models');
+      toast.error(err?.message || 'تعذر فحص مزودي النماذج.');
     } finally {
-      setLoadingModels(false);
+      if (onlyProviderId) setCheckingProviderId('');
+      else setLoadingModels(false);
     }
   };
 
   useEffect(() => {
-    if (open && activeTab === 'keys' && routerModels.length === 0 && !loadingModels) {
+    if (open && activeTab === 'keys' && !providersLoaded && !loadingModels) {
       const timer = window.setTimeout(() => { void fetchModels(); }, 0);
       return () => window.clearTimeout(timer);
     }
-  }, [open, activeTab]);
-
-  const toggleKeyVisibility = (providerId: string) => {
-    setVisibleKeys(prev => {
-      const next = new Set(prev);
-      if (next.has(providerId)) next.delete(providerId);
-      else next.add(providerId);
-      return next;
-    });
-  };
+  }, [open, activeTab, providersLoaded, loadingModels]);
 
   const handleSave = () => {
-    setProviderKeys(getProviderKeys());
     setSaved(true);
     window.setTimeout(() => {
       setSaved(false);
@@ -119,10 +134,9 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     }, 900);
   };
 
-  // Build active providers list for display
-  const activeProviders = FREE_PROVIDERS.filter(p =>
-    p.anonymous || providerKeys[p.id]
-  );
+  const activeProviders = providerStatuses.filter((provider) => ['valid', 'partial', 'available'].includes(provider.status));
+  const selectedProvider = providerStatuses.find((provider) => provider.id === providerId);
+  const selectedModel = selectedProvider?.models.find((item) => item.id === model);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -340,116 +354,114 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
 
           {activeTab === 'keys' && (
             <div className="space-y-6">
-              {/* Header — like FreeLLMAPI Keys page */}
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-base font-semibold">مزودو الذكاء الاصطناعي</h2>
-                  <p className="text-xs text-white/60">{activeProviders.length} مزود نشط من {FREE_PROVIDERS.length}</p>
+                  <h2 className="text-base font-semibold">المزود والنموذج</h2>
+                  <p className="text-xs text-white/60">{activeProviders.length} مزود يعمل من {providerStatuses.length} مهيأ</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={fetchModels} disabled={loadingModels} className="h-8 text-xs">
+                <Button variant="outline" size="sm" onClick={() => void fetchModels(true)} disabled={loadingModels} className="h-8 text-xs">
                   {loadingModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                  <span className="ml-1">فحص الكل</span>
+                  <span className="ml-1">تحديث وفحص الكل</span>
                 </Button>
               </div>
 
-              {/* Provider list — FreeLLMAPI style */}
-              <div className="space-y-3">
-                {FREE_PROVIDERS.filter(p => p.id !== 'custom').map((provider) => {
-                  const hasKey = Boolean(providerKeys[provider.id]);
-                  const isAnonymous = provider.anonymous;
-                  const isActive = isAnonymous || hasKey;
-                  const keyVisible = visibleKeys.has(provider.id);
+              <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs leading-5 text-white/70">
+                مفاتيح API محفوظة على الخادم ولا تظهر في هذه الصفحة أو تُرسل من المتصفح. فحص المفتاح يقرأ كتالوج النماذج فقط ولا يرسل طلب توليد. اختيار المزود والنموذج يُحفظ على هذا الجهاز.
+              </p>
 
-                  return (
-                    <div key={provider.id}
-                      className={`rounded-xl border-2 p-3 transition-all ${
-                        isActive ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/10 bg-white/5'
-                      }`}>
-                      {/* Provider header */}
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-400' : 'bg-white/30'}`} />
-                          <span className="text-sm font-semibold">{provider.name}</span>
-                          {isAnonymous && <Badge variant="secondary" className="text-[9px] bg-emerald-100 text-emerald-700">مجاني</Badge>}
-                          {hasKey && <Badge variant="secondary" className="text-[9px] bg-blue-100 text-blue-700">مفتاح</Badge>}
-                        </div>
-                        <div className="text-xs text-white/40">{provider.models.length} نماذج</div>
-                      </div>
-
-                      {/* Models */}
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {provider.models.map((m) => (
-                          <span key={m} className="text-[10px] px-2 py-0.5 rounded-md bg-white/10 text-white/70">{m}</span>
+              {providerStatuses.length === 0 && !loadingModels ? (
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
+                  لا توجد مزودات مهيأة على الخادم حتى الآن. حدّث الصفحة بعد إضافة مفاتيح الخادم.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">نوع المزود</Label>
+                    <Select value={providerId} onValueChange={(id) => {
+                      const nextProvider = providerStatuses.find((item) => item.id === id);
+                      setProviderId(id);
+                      setModel(nextProvider?.models[0]?.id || '');
+                    }}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="اختر المزود" /></SelectTrigger>
+                      <SelectContent>
+                        {providerStatuses.map((provider) => (
+                          <SelectItem key={provider.id} value={provider.id}>
+                            {provider.name} · {provider.models.length} نموذج
+                          </SelectItem>
                         ))}
-                      </div>
-
-                      {/* Key input — for non-anonymous providers */}
-                      {!isAnonymous && (
-                        <div className="space-y-2">
-                          <div className="relative">
-                            <input
-                              type={keyVisible ? 'text' : 'password'}
-                              value={providerKeys[provider.id] || ''}
-                              onChange={(e) => {
-                                const newKeys = { ...getProviderKeys(), [provider.id]: e.target.value };
-                                setProviderKeys(newKeys);
-                                updateProviderKey(provider.id, e.target.value);
-                              }}
-                              placeholder={`أضف مفتاح ${provider.name}...`}
-                              className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 pr-10 text-sm text-white placeholder:text-white/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fuchsia-500"
-                              autoComplete="off" spellCheck={false}
-                            />
-                            <button type="button" onClick={() => toggleKeyVisibility(provider.id)}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
-                              {keyVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                          </div>
-                          {provider.id !== 'pollinations' && provider.id !== 'google' && (
-                            <a href={provider.id === 'groq' ? 'https://console.groq.com/keys'
-                              : provider.id === 'cerebras' ? 'https://cloud.cerebras.ai/'
-                              : provider.id === 'openrouter' ? 'https://openrouter.ai/keys'
-                              : provider.id === 'mistral' ? 'https://console.mistral.ai/api-keys/'
-                              : provider.id === 'cohere' ? 'https://dashboard.cohere.com/api-keys'
-                              : '#'
-                            } target="_blank" rel="noopener noreferrer"
-                              className="text-[10px] text-fuchsia-400 hover:underline inline-flex items-center gap-1">
-                              احصل على مفتاح <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Remove key button */}
-                      {hasKey && !isAnonymous && (
-                        <button type="button" onClick={() => {
-                          const newKeys = { ...getProviderKeys() };
-                          delete newKeys[provider.id];
-                          setProviderKeys(newKeys);
-                          removeProviderKey(provider.id);
-                          toast.success(`تم حذف مفتاح ${provider.name}`);
-                        }} className="text-[10px] text-red-400 hover:text-red-300 mt-1">
-                          حذف المفتاح
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Available models from router */}
-              {routerModels.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">النماذج المتاحة</Label>
-                  <div className="max-h-40 overflow-y-auto rounded-md border border-white/10 bg-black/20 p-2 space-y-1">
-                    {routerModels.map((m, i) => (
-                      <div key={i} className="text-xs flex items-center justify-between rounded p-1.5 bg-white/5">
-                        <span className="text-white/80">{m.name}</span>
-                        <span className="text-white/40 text-[10px]">{m.provider}</span>
-                      </div>
-                    ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">نموذج الدردشة</Label>
+                    <Popover open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" role="combobox" aria-expanded={modelPickerOpen} className="w-full justify-between border-white/15 bg-black/20 text-white">
+                          <span className="truncate">{selectedModel?.name || selectedModel?.id || 'اختر نموذجًا'}</span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-[min(24rem,calc(100vw-2rem))] p-0">
+                        <Command>
+                          <CommandInput placeholder="ابحث عن نموذج..." />
+                          <CommandList className="max-h-64">
+                            <CommandEmpty>لا توجد نماذج مطابقة.</CommandEmpty>
+                            <CommandGroup>
+                              {(selectedProvider?.models || []).map((item) => (
+                                <CommandItem key={item.id} value={`${item.name} ${item.id}`} onSelect={() => {
+                                  setModel(item.id);
+                                  setModelPickerOpen(false);
+                                }}>
+                                  <span className="flex-1 truncate">{item.name}</span>
+                                  <span className="ml-2 max-w-[45%] truncate text-[10px] text-muted-foreground">{item.id}</span>
+                                  {item.id === model && <CheckCircle2 className="ml-2 h-4 w-4 text-fuchsia-400" />}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {selectedProvider && (
+                    <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 p-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <span className={`h-2 w-2 rounded-full ${['valid', 'partial', 'available'].includes(selectedProvider.status) ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                          {selectedProvider.status === 'valid' ? 'نجح فحص المفتاح' : selectedProvider.status === 'partial' ? 'بعض المفاتيح اجتازت الفحص' : selectedProvider.status === 'available' ? 'متاح دون مفتاح' : selectedProvider.status === 'invalid' ? 'المفتاح مرفوض' : 'تعذر الاتصال'}
+                        </div>
+                        <p className="mt-1 text-xs text-white/55">
+                          {selectedProvider.keyCount > 0 ? `${selectedProvider.validKeyCount} من ${selectedProvider.keyCount} مفاتيح صالحة` : 'خدمة مجهولة الهوية'} · {selectedProvider.models.length} نموذج دردشة
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => void fetchModels(true, providerId)} disabled={checkingProviderId === providerId} className="shrink-0 text-xs">
+                        {checkingProviderId === providerId ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                        <span className="ml-1">فحص المفتاح</span>
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">حالة المزودات</Label>
+                <div className="max-h-52 space-y-1 overflow-y-auto rounded-md border border-white/10 bg-black/20 p-2">
+                  {providerStatuses.map((provider) => (
+                    <div key={provider.id} className="flex items-center justify-between gap-2 rounded p-2 text-xs hover:bg-white/5">
+                      <span className="flex min-w-0 items-center gap-2 truncate">
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${['valid', 'partial', 'available'].includes(provider.status) ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                        <span className="truncate">{provider.name}</span>
+                      </span>
+                      <span className="shrink-0 text-white/50">
+                        {provider.keyCount ? `${provider.validKeyCount}/${provider.keyCount} · ` : ''}{provider.models.length} نموذج
+                      </span>
+                    </div>
+                  ))}
+                  {loadingModels && <div className="p-2 text-xs text-white/50">جارٍ فحص المزودات...</div>}
+                </div>
+              </div>
             </div>
           )}
 

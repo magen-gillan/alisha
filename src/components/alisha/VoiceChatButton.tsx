@@ -38,6 +38,8 @@ export default function VoiceChatButton({
   const abortRef = useRef<AbortController | null>(null);
   const {
     responseLanguage,
+    providerId,
+    model,
     speechRate,
     speechPitch,
     voiceLanguage,
@@ -163,6 +165,8 @@ export default function VoiceChatButton({
         userInput: userText,
         detectedLanguage: detected,
         responseLanguage,
+        providerId,
+        model,
         history: buildHistory(historyRef.current),
         permanentMemory,
         signal: controller.signal,

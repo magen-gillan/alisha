@@ -1,28 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-/**
- * Unified chat API — replaces /api/gemini and /api/pollinations.
- *
- * Uses the LLM router to try multiple providers with automatic failover.
- * API keys are sent from the client (stored in localStorage) or from
- * server-side env vars (for Gemini).
- */
-
-const RATE_LIMIT_PER_MINUTE = 60;
+const RATE_LIMIT_PER_MINUTE = 8;
 const RATE_LIMIT_MAP_MAX_SIZE = 1000;
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function getClientIp(request: NextRequest): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || request.headers.get('x-real-ip')?.trim()
+    || 'unknown';
+}
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
   if (!entry || entry.resetAt < now) {
     if (rateLimitMap.size > RATE_LIMIT_MAP_MAX_SIZE) {
-      for (const [key, val] of rateLimitMap) {
-        if (val.resetAt < now) rateLimitMap.delete(key);
-      }
+      for (const [key, value] of rateLimitMap) if (value.resetAt < now) rateLimitMap.delete(key);
     }
     rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
     return false;
@@ -31,123 +28,87 @@ function isRateLimited(ip: string): boolean {
   return entry.count > RATE_LIMIT_PER_MINUTE;
 }
 
-function getClientIp(request: NextRequest): string {
-  return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip')?.trim() ||
-    'unknown'
-  );
+function errorResponse(message: string, status: number) {
+  return NextResponse.json({ error: { message } }, { status });
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const clientIp = getClientIp(request);
-    if (isRateLimited(clientIp)) {
-      return NextResponse.json(
-        { error: { message: 'تم تجاوز عدد الطلبات المسموح. حاول بعد دقيقة.' } },
-        { status: 429 },
-      );
+    if (isRateLimited(getClientIp(request))) {
+      return errorResponse('تم تجاوز عدد الطلبات المسموح. حاول بعد دقيقة.', 429);
     }
 
     const body = await request.json();
-    const messages = body?.messages;
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json(
-        { error: { message: 'messages array is required.' } },
-        { status: 400 },
-      );
+    const rawMessages = body?.messages;
+    if (!Array.isArray(rawMessages) || rawMessages.length === 0 || rawMessages.length > 30) {
+      return errorResponse('يجب إرسال سجل محادثة صالح.', 400);
     }
 
-    // Collect provider keys from the request body
-    // The client sends keys from localStorage
-    const userKeys: Record<string, string> = {};
-    if (body.providerKeys && typeof body.providerKeys === 'object') {
-      for (const [id, key] of Object.entries(body.providerKeys)) {
-        if (typeof key === 'string' && key.trim()) {
-          userKeys[id] = key.trim();
-        }
-      }
+    const messages = rawMessages.map((message: any) => ({
+      role: message?.role,
+      content: message?.content,
+    }));
+    const validRoles = new Set(['system', 'user', 'assistant']);
+    if (messages.some((message: any) => !validRoles.has(message.role) || typeof message.content !== 'string')) {
+      return errorResponse('صيغة الرسائل غير صالحة.', 400);
+    }
+    if (messages.reduce((sum: number, message: any) => sum + message.content.length, 0) > 16_000) {
+      return errorResponse('حجم المحادثة أكبر من الحد المسموح.', 413);
     }
 
-    // Build provider list
-    const { buildProviderList, routeChat } = await import('@/lib/alisha/llm-router');
-    const providers = buildProviderList(userKeys);
+    const providerId = typeof body.providerId === 'string' ? body.providerId : '';
+    const requestedModel = typeof body.model === 'string' ? body.model : '';
+    if (!providerId) return errorResponse('اختر مزودًا من الإعدادات أولًا.', 400);
 
-    if (providers.length === 0) {
-      return NextResponse.json(
-        { error: { message: 'No providers available. Add API keys in settings.' } },
-        { status: 503 },
-      );
+    const { buildProviderList, getSelectedProvider, listProviderStatuses, routeChat } = await import('@/lib/alisha/llm-router');
+    const providerStatus = (await listProviderStatuses({ providerId }))[0];
+    if (!providerStatus || !['valid', 'partial', 'available'].includes(providerStatus.status)) {
+      return errorResponse('المزود غير متاح حاليًا. افحص حالة المفتاح أو اختر مزودًا آخر.', 503);
     }
 
+    const model = requestedModel || providerStatus.models[0]?.id;
+    if (!model) return errorResponse('لا توجد نماذج دردشة متاحة لهذا المزود.', 503);
+    const provider = await getSelectedProvider(providerId, model);
+    if (!provider) return errorResponse('النموذج المحدد غير موجود في قائمة هذا المزود.', 400);
+
+    const configured = buildProviderList({ [providerId]: provider.models });
     const result = await routeChat(
       {
-        messages: messages.map((m: any) => ({
-          role: m.role,
-          content: m.content,
-        })),
-        model: body.model,
-        temperature: body.temperature,
-        max_tokens: body.max_tokens,
+        messages,
+        providerId,
+        model,
+        temperature: typeof body.temperature === 'number' ? Math.min(Math.max(body.temperature, 0), 1.5) : 0.7,
+        max_tokens: typeof body.max_tokens === 'number' ? Math.min(Math.max(body.max_tokens, 1), 1200) : 700,
       },
-      providers,
+      configured.filter((item) => item.id === providerId),
       request.signal,
     );
 
     return NextResponse.json({
-      choices: [{
-        message: { role: 'assistant', content: result.text },
-        finish_reason: 'stop',
-      }],
+      choices: [{ message: { role: 'assistant', content: result.text }, finish_reason: 'stop' }],
       model: result.model,
       provider: result.provider,
     });
   } catch (error: any) {
-    if (error?.name === 'AbortError') {
-      return new NextResponse(null, { status: 499 });
-    }
-    return NextResponse.json(
-      { error: { message: error?.message || 'Chat request failed.' } },
-      { status: 500 },
-    );
+    if (error?.name === 'AbortError') return new NextResponse(null, { status: 499 });
+    // Do not return provider response bodies or credential-related details.
+    return errorResponse(error?.message || 'تعذر إكمال طلب المحادثة.', 502);
   }
 }
 
 export async function GET(request: NextRequest) {
-  const clientIp = getClientIp(request);
-  if (isRateLimited(clientIp)) {
-    return NextResponse.json(
-      { error: { message: 'Rate limited.' } },
-      { status: 429 },
-    );
-  }
-
-  const { buildProviderList, listAvailableModels } = await import('@/lib/alisha/llm-router');
-
-  // Get keys from headers
-  const userKeys: Record<string, string> = {};
-  const keysHeader = request.headers.get('x-provider-keys');
-  if (keysHeader) {
-    try {
-      const parsed = JSON.parse(keysHeader);
-      for (const [id, key] of Object.entries(parsed)) {
-        if (typeof key === 'string' && key.trim()) {
-          userKeys[id] = key.trim();
-        }
-      }
-    } catch {}
-  }
-
-  const providers = buildProviderList(userKeys);
-  const models = listAvailableModels(providers);
-
-  return NextResponse.json({
-    object: 'list',
-    data: models.map(m => ({
-      id: m.id,
-      provider: m.provider,
-      name: m.name,
-    })),
-    models: models,
+  if (isRateLimited(getClientIp(request))) return errorResponse('تم تجاوز عدد الطلبات. حاول لاحقًا.', 429);
+  const providerId = request.nextUrl.searchParams.get('provider') || undefined;
+  const force = request.nextUrl.searchParams.get('refresh') === '1';
+  const { listProviderStatuses } = await import('@/lib/alisha/llm-router');
+  const providers = await listProviderStatuses({ providerId, force });
+  const models = providers.flatMap((provider) => provider.models.map((model) => ({
+    id: model.id,
+    provider: provider.name,
+    providerId: provider.id,
+    name: model.name,
+  })));
+  return NextResponse.json({ object: 'list', providers, data: models, models }, {
+    headers: { 'Cache-Control': 'no-store, max-age=0' },
   });
 }

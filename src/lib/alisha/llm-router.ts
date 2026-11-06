@@ -1,52 +1,240 @@
 /**
- * Unified LLM Router — inspired by FreeLLMAPI.
- *
- * Aggregates multiple OpenAI-compatible providers behind a single endpoint.
- * The router:
- * 1. Tries providers in priority order
- * 2. Falls back to the next provider on rate-limit (429) or error (5xx)
- * 3. Tracks per-key cooldowns in memory
- * 4. Supports both user-supplied keys and anonymous (keyless) providers
- *
- * Each provider entry has:
- *   - id: unique identifier
- *   - name: display name
- *   - baseUrl: OpenAI-compatible API base URL
- *   - apiKey: user's API key (or empty for anonymous)
- *   - models: list of available model IDs
- *   - priority: lower = tried first
- *   - anonymous: true if no key needed
+ * Server-side LLM router. Credentials are read only from server environment
+ * variables and are never returned in provider/model API responses.
  */
 
 export interface LLMProvider {
   id: string;
   name: string;
   baseUrl: string;
-  apiKey?: string;
+  apiKeys: string[];
   models: string[];
   priority: number;
   anonymous?: boolean;
-  enabled: boolean;
 }
 
 export interface ChatRequest {
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+  providerId?: string;
   model?: string;
   temperature?: number;
   max_tokens?: number;
-  stream?: boolean;
 }
 
-export interface ChatResponse {
-  text: string;
-  model: string;
-  provider: string;
+export interface ProviderStatus {
+  id: string;
+  name: string;
+  status: 'available' | 'valid' | 'partial' | 'invalid' | 'unavailable';
+  keyCount: number;
+  validKeyCount: number;
+  models: Array<{ id: string; name: string }>;
 }
 
-// In-memory cooldown tracking: providerId → expiry timestamp
+interface ProviderDefinition {
+  id: string;
+  name: string;
+  baseUrl: string;
+  priority: number;
+  envNames: string[];
+  anonymous?: boolean;
+  fixedModels?: string[];
+}
+
+const DEFINITIONS: ProviderDefinition[] = [
+  {
+    id: 'pollinations', name: 'Pollinations',
+    baseUrl: 'https://text.pollinations.ai/openai', priority: 1,
+    envNames: ['POLLINATIONS_API_KEY'], anonymous: true,
+    fixedModels: ['openai-fast'],
+  },
+  {
+    id: 'google', name: 'Google Gemini',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', priority: 2,
+    envNames: ['GEMINI_API_KEY', 'GEMINI_API_KEY_2'],
+  },
+  {
+    id: 'openai', name: 'OpenAI',
+    baseUrl: 'https://api.openai.com/v1', priority: 3,
+    envNames: ['OPENAI_API_KEY'],
+  },
+  {
+    id: 'openrouter', name: 'OpenRouter',
+    baseUrl: 'https://openrouter.ai/api/v1', priority: 4,
+    envNames: ['OPENROUTER_API_KEY', 'OPENROUTER_API_KEY_2'],
+  },
+  {
+    id: 'huggingface', name: 'Hugging Face Inference',
+    baseUrl: 'https://router.huggingface.co/v1', priority: 5,
+    envNames: ['HUGGINGFACE_API_KEY', 'HF_TOKEN'],
+  },
+  {
+    id: 'zai', name: 'Z.ai / GLM',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4', priority: 6,
+    envNames: ['ZAI_API_KEY', 'GLM_API_KEY'],
+  },
+];
+
+const MODEL_CACHE_MS = 5 * 60_000;
+const modelCache = new Map<string, { expiresAt: number; result: ProviderStatus }>();
+
+function keysFor(definition: ProviderDefinition): string[] {
+  const values = definition.envNames
+    .map((name) => process.env[name]?.trim())
+    .filter((value): value is string => Boolean(value));
+  return [...new Set(values)];
+}
+
+/** Only configured providers are included, except the anonymous Pollinations tier. */
+export function buildProviderList(modelsByProvider: Record<string, string[]> = {}): LLMProvider[] {
+  return DEFINITIONS.flatMap((definition) => {
+    const apiKeys = keysFor(definition);
+    if (!definition.anonymous && apiKeys.length === 0) return [];
+    return [{
+      id: definition.id,
+      name: definition.name,
+      baseUrl: definition.baseUrl,
+      apiKeys,
+      models: modelsByProvider[definition.id] ?? definition.fixedModels ?? [],
+      priority: definition.priority,
+      anonymous: definition.anonymous,
+    }];
+  }).sort((a, b) => a.priority - b.priority);
+}
+
+function isChatModelId(id: string): boolean {
+  const value = id.toLowerCase();
+  return !/(embedding|embed-|transcri|\btts\b|text-to-speech|audio|realtime|dall-e|gpt-image|moderation|whisper|rerank|ocr|asr|speech|video|computer-use|deep-research|\btts\b)/i.test(value);
+}
+
+function unwrapModelRows(data: any): any[] {
+  if (Array.isArray(data?.models)) return data.models;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+}
+
+function normalizeModelRows(rows: any[], providerId: string): Array<{ id: string; name: string }> {
+  const normalized: Array<{ id: string; name: string }> = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    let id = typeof row.id === 'string' ? row.id : typeof row.name === 'string' ? row.name : '';
+    id = id.replace(/^models\//, '').trim();
+    if (!id || !isChatModelId(id)) continue;
+
+    if (providerId === 'google') {
+      const methods = row.supportedGenerationMethods;
+      if (Array.isArray(methods) && !methods.includes('generateContent')) continue;
+      const output = row.outputModalities ?? row.output_modalities;
+      if (Array.isArray(output) && output.length > 0 && !output.some((mode: unknown) => String(mode).toUpperCase() === 'TEXT')) continue;
+    }
+    if (providerId === 'openrouter') {
+      const modality = row.architecture?.modality;
+      const output = row.architecture?.output_modalities;
+      if (typeof modality === 'string' && modality.length > 0 && !/text.*->.*text/i.test(modality)) continue;
+      if (Array.isArray(output) && output.length > 0 && !output.some((mode: unknown) => String(mode).toLowerCase() === 'text')) continue;
+    }
+
+    normalized.push({
+      id,
+      name: (typeof row.displayName === 'string' && row.displayName) || (typeof row.name === 'string' ? row.name.replace(/^models\//, '') : id),
+    });
+  }
+
+  const unique = new Map<string, { id: string; name: string }>();
+  for (const model of normalized) unique.set(model.id, model);
+  const result = [...unique.values()];
+  if (providerId === 'google') {
+    const preferred = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+    result.sort((a, b) => {
+      const ai = preferred.indexOf(a.id);
+      const bi = preferred.indexOf(b.id);
+      if (ai >= 0 || bi >= 0) return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+      return a.name.localeCompare(b.name);
+    });
+  } else {
+    result.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  return result;
+}
+
+async function readModelCatalog(provider: LLMProvider, apiKey: string): Promise<{ status: number; models: Array<{ id: string; name: string }> }> {
+  if (provider.id === 'pollinations') {
+    return { status: 200, models: (provider.models.length ? provider.models : ['openai-fast']).map((id) => ({ id, name: id })) };
+  }
+
+  let url = `${provider.baseUrl}/models`;
+  let headers: Record<string, string> = { Accept: 'application/json' };
+  if (provider.id === 'google') {
+    url = 'https://generativelanguage.googleapis.com/v1beta/models';
+    headers['x-goog-api-key'] = apiKey;
+  } else {
+    headers.Authorization = `Bearer ${apiKey}`;
+    if (provider.id === 'openrouter') url = 'https://openrouter.ai/api/v1/models/user';
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers,
+      signal: AbortSignal.timeout(12_000),
+      cache: 'no-store',
+    });
+    if (!response.ok) return { status: response.status, models: [] };
+    const data = await response.json();
+    const rows = provider.id === 'google' && Array.isArray(data?.models) ? data.models : unwrapModelRows(data);
+    return { status: response.status, models: normalizeModelRows(rows, provider.id) };
+  } catch {
+    return { status: 0, models: [] };
+  }
+}
+
+async function inspectProvider(provider: LLMProvider, force = false): Promise<ProviderStatus> {
+  const cached = modelCache.get(provider.id);
+  if (!force && cached && cached.expiresAt > Date.now()) return cached.result;
+
+  if (provider.anonymous && provider.apiKeys.length === 0) {
+    const result: ProviderStatus = {
+      id: provider.id, name: provider.name, status: 'available',
+      keyCount: 0, validKeyCount: 0,
+      models: (provider.models.length ? provider.models : ['openai-fast']).map((id) => ({ id, name: id })),
+    };
+    modelCache.set(provider.id, { expiresAt: Date.now() + MODEL_CACHE_MS, result });
+    return result;
+  }
+
+  const checks = await Promise.all(provider.apiKeys.map((key) => readModelCatalog(provider, key)));
+  const valid = checks.filter((check) => check.status >= 200 && check.status < 300);
+  const models = new Map<string, { id: string; name: string }>();
+  for (const check of valid) for (const model of check.models) models.set(model.id, model);
+  const mergedModels = [...models.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const allDenied = checks.length > 0 && checks.every((check) => check.status === 401 || check.status === 403);
+  const result: ProviderStatus = {
+    id: provider.id,
+    name: provider.name,
+    status: valid.length === checks.length ? 'valid' : valid.length > 0 ? 'partial' : allDenied ? 'invalid' : 'unavailable',
+    keyCount: provider.apiKeys.length,
+    validKeyCount: valid.length,
+    models: mergedModels,
+  };
+  modelCache.set(provider.id, { expiresAt: Date.now() + MODEL_CACHE_MS, result });
+  return result;
+}
+
+/** Public-safe health/model inventory; never returns key values or upstream error bodies. */
+export async function listProviderStatuses(options: { providerId?: string; force?: boolean } = {}): Promise<ProviderStatus[]> {
+  const providers = buildProviderList();
+  const selected = options.providerId ? providers.filter((provider) => provider.id === options.providerId) : providers;
+  return Promise.all(selected.map((provider) => inspectProvider(provider, options.force)));
+}
+
+/** Find a provider with only its own configured keys for the selected model. */
+export async function getSelectedProvider(providerId: string, modelId: string): Promise<LLMProvider | null> {
+  const status = (await listProviderStatuses({ providerId }))[0];
+  if (!status || !status.models.some((model) => model.id === modelId)) return null;
+  return buildProviderList({ [providerId]: status.models.map((model) => model.id) })
+    .find((provider) => provider.id === providerId) ?? null;
+}
+
 const cooldowns = new Map<string, number>();
 
-/** Check if a provider is currently on cooldown */
 function isOnCooldown(providerId: string): boolean {
   const expiry = cooldowns.get(providerId);
   if (!expiry) return false;
@@ -57,270 +245,85 @@ function isOnCooldown(providerId: string): boolean {
   return true;
 }
 
-/** Set a cooldown on a provider (e.g. after a 429) */
 function setCooldown(providerId: string, durationMs: number): void {
-  cooldowns.set(providerId, Date.now() + durationMs);
+  cooldowns.set(providerId, Date.now() + Math.max(durationMs, 5_000));
 }
 
-/** Parse Retry-After header (seconds or HTTP date) */
-function parseRetryAfterMs(value: string | null): number {
-  if (!value) return 60_000; // default 60s
-  const seconds = parseInt(value, 10);
-  if (!isNaN(seconds)) return seconds * 1000;
-  return 60_000;
+function retryAfterMs(value: string | null): number {
+  const seconds = Number.parseInt(value || '', 10);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds * 1000, 5 * 60_000) : 30_000;
 }
 
-/**
- * The built-in free providers catalog.
- * These work WITHOUT any API key (anonymous tier).
- * User-added keys override the anonymous behavior.
- */
-export const FREE_PROVIDERS: Omit<LLMProvider, 'apiKey' | 'enabled'>[] = [
-  {
-    id: 'pollinations',
-    name: 'Pollinations',
-    baseUrl: 'https://text.pollinations.ai/openai',
-    models: ['openai-fast'],
-    priority: 1,
-    anonymous: true,
-  },
-  {
-    id: 'groq',
-    name: 'Groq',
-    baseUrl: 'https://api.groq.com/openai/v1',
-    models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
-    priority: 2,
-  },
-  {
-    id: 'cerebras',
-    name: 'Cerebras',
-    baseUrl: 'https://api.cerebras.ai/v1',
-    models: ['llama-3.3-70b', 'llama-3.1-8b'],
-    priority: 3,
-  },
-  {
-    id: 'google',
-    name: 'Google Gemini',
-    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    models: ['gemini-flash-latest', 'gemini-flash-lite-latest'],
-    priority: 4,
-  },
-  {
-    id: 'openrouter',
-    name: 'OpenRouter (free)',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    models: ['meta-llama/llama-3.3-70b-instruct:free', 'google/gemini-flash-1.5:free'],
-    priority: 5,
-  },
-  {
-    id: 'mistral',
-    name: 'Mistral',
-    baseUrl: 'https://api.mistral.ai/v1',
-    models: ['mistral-small-latest', 'mistral-tiny'],
-    priority: 6,
-  },
-  {
-    id: 'cohere',
-    name: 'Cohere',
-    baseUrl: 'https://api.cohere.ai/v1',
-    models: ['command-r-plus', 'command-r'],
-    priority: 7,
-  },
-  {
-    id: 'samba',
-    name: 'SambaNova',
-    baseUrl: 'https://api.sambanova.ai/v1',
-    models: ['Meta-Llama-3.1-70B-Instruct'],
-    priority: 8,
-  },
-  {
-    id: 'nvidia',
-    name: 'NVIDIA',
-    baseUrl: 'https://integrate.api.nvidia.com/v1',
-    models: ['meta/llama-3.3-70b-instruct'],
-    priority: 9,
-  },
-  {
-    id: 'zhipu',
-    name: 'Z.ai',
-    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-    models: ['glm-4-flash', 'glm-4-flashx'],
-    priority: 10,
-  },
-  {
-    id: 'custom',
-    name: 'Custom Endpoint',
-    baseUrl: '',
-    models: [],
-    priority: 99,
-  },
-];
-
-/**
- * Build the active provider list from:
- * 1. User-supplied keys (from localStorage)
- * 2. Anonymous free providers (Pollinations)
- * 3. Server-side baked keys (Gemini from Vercel env)
- */
-export function buildProviderList(userKeys: Record<string, string> = {}): LLMProvider[] {
-  const providers: LLMProvider[] = [];
-
-  for (const p of FREE_PROVIDERS) {
-    const userKey = userKeys[p.id];
-    const serverKey = p.id === 'google' ? (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : '') : '';
-
-    // Include if: anonymous (Pollinations), or has user key, or has server key
-    const hasKey = Boolean(userKey || serverKey);
-    if (p.anonymous || hasKey) {
-      providers.push({
-        ...p,
-        apiKey: userKey || serverKey || undefined,
-        enabled: true,
-      });
-    }
-  }
-
-  // Sort by priority
-  providers.sort((a, b) => a.priority - b.priority);
-  return providers;
-}
-
-/**
- * Route a chat request through available providers.
- * Tries each provider in priority order, falls back on error.
- */
+/** Routes a chat request through the selected provider, trying its configured key pool. */
 export async function routeChat(
   req: ChatRequest,
   providers: LLMProvider[],
   signal?: AbortSignal,
-): Promise<ChatResponse> {
-  if (providers.length === 0) {
-    throw new Error('No providers configured. Add an API key or use the free tier.');
-  }
+): Promise<{ text: string; model: string; provider: string }> {
+  const ordered = req.providerId
+    ? providers.filter((provider) => provider.id === req.providerId)
+    : [...providers].sort((a, b) => a.priority - b.priority);
+  if (ordered.length === 0) throw new Error('المزود المحدد غير مهيأ على الخادم.');
 
-  let lastError: Error | null = null;
   const diagnostics: string[] = [];
-
-  for (const provider of providers) {
-    if (!provider.enabled) continue;
+  for (const provider of ordered) {
     if (isOnCooldown(provider.id)) {
-      diagnostics.push(`${provider.name}: on cooldown`);
+      diagnostics.push(`${provider.name}: cooldown`);
       continue;
     }
+    const model = req.model || provider.models[0];
+    if (!model) {
+      diagnostics.push(`${provider.name}: no chat models`);
+      continue;
+    }
+    const keys: Array<string | undefined> = provider.apiKeys.length ? provider.apiKeys : [undefined];
+    let retryMs = 30_000;
+    let rateLimited = false;
 
-    try {
-      // Pick a model: use the requested model if this provider has it,
-      // otherwise use the provider's first model.
-      let model = req.model || provider.models[0];
-      if (!provider.models.includes(model)) {
-        model = provider.models[0];
-      }
-
-      const url = `${provider.baseUrl}/chat/completions`;
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-
-      // Auth varies by provider
-      if (provider.apiKey) {
-        if (provider.id === 'google') {
-          // Gemini uses API key in URL or x-goog-api-key header
-          headers['x-goog-api-key'] = provider.apiKey;
-        } else if (provider.id === 'cohere') {
-          headers['Authorization'] = `Bearer ${provider.apiKey}`;
-        } else {
-          headers['Authorization'] = `Bearer ${provider.apiKey}`;
+    for (const apiKey of keys) {
+      try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (apiKey) {
+          if (provider.id === 'google') headers['x-goog-api-key'] = apiKey;
+          else headers.Authorization = `Bearer ${apiKey}`;
         }
+        const response = await fetch(`${provider.baseUrl}/chat/completions`, {
+          method: 'POST', headers,
+          body: JSON.stringify({
+            model,
+            messages: req.messages,
+            temperature: req.temperature ?? 0.7,
+            max_tokens: Math.min(Math.max(req.max_tokens ?? 700, 1), 1200),
+            stream: false,
+          }),
+          signal,
+        });
+        if (response.status === 429 || response.status >= 500) {
+          if (response.status === 429) rateLimited = true;
+          retryMs = retryAfterMs(response.headers.get('retry-after'));
+          continue;
+        }
+        if (!response.ok) {
+          diagnostics.push(`${provider.name}: HTTP ${response.status}`);
+          if (response.status === 401 || response.status === 403) continue;
+          break;
+        }
+        const data = await response.json();
+        const text = data?.choices?.[0]?.message?.content;
+        if (typeof text !== 'string' || !text.trim()) {
+          diagnostics.push(`${provider.name}: empty response`);
+          break;
+        }
+        return { text: text.trim(), model, provider: provider.name };
+      } catch (error: any) {
+        if (error?.name === 'AbortError') throw error;
+        diagnostics.push(`${provider.name}: network error`);
       }
-
-      const body = {
-        model,
-        messages: req.messages,
-        temperature: req.temperature ?? 0.8,
-        max_tokens: req.max_tokens ?? 1024,
-        stream: false,
-      };
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal,
-      });
-
-      if (response.status === 429 || response.status >= 500) {
-        const retryAfter = parseRetryAfterMs(response.headers.get('retry-after'));
-        setCooldown(provider.id, retryAfter);
-        diagnostics.push(`${provider.name}: HTTP ${response.status} (cooldown ${Math.round(retryAfter / 1000)}s)`);
-        lastError = new Error(`${provider.name} returned ${response.status}`);
-        continue;
-      }
-
-      if (!response.ok) {
-        const errBody = await response.text().catch(() => '');
-        diagnostics.push(`${provider.name}: HTTP ${response.status} - ${errBody.slice(0, 100)}`);
-        lastError = new Error(`${provider.name}: ${response.status}`);
-        continue;
-      }
-
-      const data = await response.json();
-
-      // OpenAI-compatible response format
-      const text = data?.choices?.[0]?.message?.content || '';
-      if (!text) {
-        diagnostics.push(`${provider.name}: empty response`);
-        lastError = new Error(`${provider.name}: empty response`);
-        continue;
-      }
-
-      return {
-        text: text.trim(),
-        model,
-        provider: provider.name,
-      };
-    } catch (err: any) {
-      if (err?.name === 'AbortError') throw err;
-      diagnostics.push(`${provider.name}: ${err?.message || 'unknown error'}`);
-      lastError = err;
+    }
+    if (provider.apiKeys.length > 0 && rateLimited) {
+      setCooldown(provider.id, retryMs);
+      diagnostics.push(`${provider.name}: rate limited`);
     }
   }
-
-  // All providers exhausted
-  throw new Error(
-    `All providers exhausted. ${diagnostics.join('; ')}. ` +
-    `Add more API keys or wait for rate limits to reset.`
-  );
-}
-
-/**
- * List all available models across all configured providers.
- */
-export function listAvailableModels(providers: LLMProvider[]): Array<{ id: string; provider: string; name: string }> {
-  const models: Array<{ id: string; provider: string; name: string }> = [];
-  for (const p of providers) {
-    if (!p.enabled) continue;
-    for (const m of p.models) {
-      models.push({ id: m, provider: p.name, name: m });
-    }
-  }
-  return models;
-}
-
-/**
- * Get cooldown status for all providers (for UI display).
- */
-export function getProviderStatus(providers: LLMProvider[]): Array<{ id: string; name: string; onCooldown: boolean; resetIn?: number }> {
-  return providers.map(p => {
-    const expiry = cooldowns.get(p.id);
-    if (!expiry || Date.now() > expiry) {
-      return { id: p.id, name: p.name, onCooldown: false };
-    }
-    return {
-      id: p.id,
-      name: p.name,
-      onCooldown: true,
-      resetIn: Math.ceil((expiry - Date.now()) / 1000),
-    };
-  });
+  throw new Error(`تعذر الاتصال بالمزود المحدد. ${diagnostics.join('; ')}`);
 }
