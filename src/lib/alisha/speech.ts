@@ -217,6 +217,7 @@ export function speak(opts: TTSOptions): void {
   speechGeneration += 1;
   const generation = speechGeneration;
   if (pendingSpeakTimer) clearTimeout(pendingSpeakTimer);
+  window.dispatchEvent(new Event('alisha:tts-end'));
   window.speechSynthesis.cancel();
 
   const utter = new SpeechSynthesisUtterance(opts.text);
@@ -233,12 +234,28 @@ export function speak(opts: TTSOptions): void {
     if (generation !== speechGeneration) return;
     opts.onStart?.();
   };
+  // Web Speech does not expose its rendered audio stream to Web Audio.
+  // Boundary events are therefore the best browser-native timing signal for
+  // driving the avatar's jaw approximately in sync with spoken words.
+  utter.onboundary = (event: SpeechSynthesisEvent) => {
+    if (generation !== speechGeneration || typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('alisha:tts-boundary', {
+      detail: {
+        text: opts.text,
+        charIndex: event.charIndex,
+        charLength: event.charLength,
+        name: event.name,
+      },
+    }));
+  };
   utter.onend = () => {
     if (generation !== speechGeneration) return;
+    window.dispatchEvent(new Event('alisha:tts-end'));
     opts.onEnd?.();
   };
   utter.onerror = (e) => {
     if (generation !== speechGeneration) return;
+    window.dispatchEvent(new Event('alisha:tts-end'));
     opts.onError?.(e?.error || 'tts_error');
   };
 
@@ -255,7 +272,10 @@ export function stopSpeaking(): void {
     clearTimeout(pendingSpeakTimer);
     pendingSpeakTimer = null;
   }
-  if (isTTSSupported()) window.speechSynthesis.cancel();
+  if (isTTSSupported()) {
+    window.speechSynthesis.cancel();
+    window.dispatchEvent(new Event('alisha:tts-end'));
+  }
 }
 
 export function isSpeaking(): boolean {

@@ -72,6 +72,7 @@ function AvatarInstance({
   const speakingRef = useRef(speaking);
   const listeningRef = useRef(listening);
   const thinkingRef = useRef(thinking);
+  const speechMouthRef = useRef({ value: 0, at: 0 });
 
   // Cursor follow
   const cursorRef = useCursorFollow();
@@ -93,6 +94,32 @@ function AvatarInstance({
   useEffect(() => { speakingRef.current = speaking; }, [speaking]);
   useEffect(() => { listeningRef.current = listening; }, [listening]);
   useEffect(() => { thinkingRef.current = thinking; }, [thinking]);
+
+  // Web Speech exposes word-boundary timing (not raw audio). Use each spoken
+  // word to open the jaw approximately in sync, and retain the old animation
+  // as a fallback on engines that do not emit boundary events.
+  useEffect(() => {
+    const onBoundary = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        text?: string; charIndex?: number; charLength?: number; name?: string;
+      }>).detail;
+      if (!detail?.text || typeof detail.charIndex !== 'number') return;
+      const start = Math.max(0, detail.charIndex);
+      const length = Math.max(1, detail.charLength || 10);
+      const spokenPart = detail.text.slice(start, start + length);
+      const hasLetters = /[\p{L}\p{M}]/u.test(spokenPart);
+      const vowels = (spokenPart.match(/[aeiouyаеёиоуыэюяاأإآؤئيىةَُِّٰあいうえおアイウエオ]/giu) || []).length;
+      const value = !hasLetters ? 0.03 : Math.min(0.82, 0.22 + vowels * 0.11);
+      speechMouthRef.current = { value, at: performance.now() };
+    };
+    const onEnd = () => { speechMouthRef.current = { value: 0, at: 0 }; };
+    window.addEventListener('alisha:tts-boundary', onBoundary);
+    window.addEventListener('alisha:tts-end', onEnd);
+    return () => {
+      window.removeEventListener('alisha:tts-boundary', onBoundary);
+      window.removeEventListener('alisha:tts-end', onEnd);
+    };
+  }, []);
 
   // ---- Live2D init ----
   useEffect(() => {
@@ -297,7 +324,14 @@ function AvatarInstance({
 
               // ---- Lip-sync ----
               if (speakingRef.current) {
-                if (now >= nextMouthChange) {
+                const sync = speechMouthRef.current;
+                if (sync.at > 0 && now - sync.at < 900) {
+                  // Small jaw movement between word events keeps the mouth
+                  // from appearing frozen while staying aligned to speech.
+                  mouthTarget = sync.value * (0.82 + 0.18 * Math.max(0, Math.sin(now * 0.018)));
+                } else if (now >= nextMouthChange) {
+                  // Compatibility fallback: some mobile TTS engines omit
+                  // SpeechSynthesis boundary events entirely.
                   mouthTarget = Math.random() < 0.22 ? 0.04 : 0.14 + Math.random() * 0.68;
                   nextMouthChange = now + 90 + Math.random() * 130;
                 }
