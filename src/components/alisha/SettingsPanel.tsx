@@ -100,10 +100,11 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
       setProvidersLoaded(true);
 
       const currentSettings = useAlishaStore.getState();
-      const isUsable = (provider: RouterProviderStatus) => ['valid', 'partial', 'available'].includes(provider.status);
+      const isUsable = (provider: RouterProviderStatus) => provider.models.length > 0
+        && ['valid', 'partial', 'available'].includes(provider.status);
       const selected = list.find((provider) => provider.id === currentSettings.providerId && isUsable(provider))
         || list.find(isUsable);
-      if (selected && ['valid', 'partial', 'available'].includes(selected.status)) {
+      if (selected && selected.models.length > 0 && ['valid', 'partial', 'available'].includes(selected.status)) {
         if (selected.id !== currentSettings.providerId) {
           setProviderId(selected.id);
           setModel(selected.models[0]?.id || '');
@@ -134,7 +135,8 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     }, 900);
   };
 
-  const activeProviders = providerStatuses.filter((provider) => ['valid', 'partial', 'available'].includes(provider.status));
+  const activeProviders = providerStatuses.filter((provider) => provider.models.length > 0
+    && ['valid', 'partial', 'available'].includes(provider.status));
   const selectedProvider = providerStatuses.find((provider) => provider.id === providerId);
   const selectedModel = selectedProvider?.models.find((item) => item.id === model);
 
@@ -361,12 +363,12 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                 </div>
                 <Button variant="outline" size="sm" onClick={() => void fetchModels(true)} disabled={loadingModels} className="h-8 text-xs">
                   {loadingModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                  <span className="ml-1">تحديث وفحص الكل</span>
+                  <span className="ml-1">تحديث حالة النماذج</span>
                 </Button>
               </div>
 
               <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs leading-5 text-white/70">
-                مفاتيح API محفوظة على الخادم ولا تظهر في هذه الصفحة أو تُرسل من المتصفح. فحص المفتاح يقرأ كتالوج النماذج فقط ولا يرسل طلب توليد. اختيار المزود والنموذج يُحفظ على هذا الجهاز.
+                مفاتيح API محفوظة على الخادم ولا تظهر في الصفحة. الموديلات المعروضة اجتازت طلب دردشة قصيرًا على المفتاح المرتبط بها؛ اختيار المزود والنموذج محفوظ على هذا الجهاز. عند تغيير المفتاح يجب إعادة اختبار الموديلات.
               </p>
 
               {providerStatuses.length === 0 && !loadingModels ? (
@@ -385,13 +387,19 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                       <SelectTrigger className="w-full"><SelectValue placeholder="اختر المزود" /></SelectTrigger>
                       <SelectContent>
                         {providerStatuses.map((provider) => (
-                          <SelectItem key={provider.id} value={provider.id}>
-                            {provider.name} · {provider.models.length} نموذج
+                          <SelectItem key={provider.id} value={provider.id} disabled={provider.models.length === 0}>
+                            {provider.name} · {provider.models.length} نموذج مجتاز
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {selectedProvider && selectedProvider.models.length === 0 && (
+                    <div className="rounded-lg border border-amber-400/20 bg-amber-400/10 p-3 text-xs leading-5 text-amber-100/90">
+                      لم ينجح أي نموذج لهذا المزود في اختبار دردشة فعلي، لذلك لن يظهر في قائمة الاختيار. قد يكون السبب رصيدًا غير متاح أو حدّ طلبات أو عدم دعم النموذج.
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">نموذج الدردشة</Label>
@@ -429,16 +437,16 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                     <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 p-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 text-sm font-medium">
-                          <span className={`h-2 w-2 rounded-full ${['valid', 'partial', 'available'].includes(selectedProvider.status) ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                          {selectedProvider.status === 'valid' ? 'نجح فحص المفتاح' : selectedProvider.status === 'partial' ? 'بعض المفاتيح اجتازت الفحص' : selectedProvider.status === 'available' ? 'متاح دون مفتاح' : selectedProvider.status === 'invalid' ? 'المفتاح مرفوض' : 'تعذر الاتصال'}
+                          <span className={`h-2 w-2 rounded-full ${selectedProvider.models.length ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                          {selectedProvider.status === 'valid' ? 'الموديلات المختبرة متاحة' : selectedProvider.status === 'partial' ? 'بعض المفاتيح لديها موديلات مختبرة' : selectedProvider.status === 'available' ? 'متاح دون مفتاح' : selectedProvider.status === 'invalid' ? 'المفتاح مرفوض' : selectedProvider.status === 'no-tested-models' ? 'لا يوجد موديل اجتاز اختبار الدردشة' : 'تعذر الاتصال'}
                         </div>
                         <p className="mt-1 text-xs text-white/55">
-                          {selectedProvider.keyCount > 0 ? `${selectedProvider.validKeyCount} من ${selectedProvider.keyCount} مفاتيح صالحة` : 'خدمة مجهولة الهوية'} · {selectedProvider.models.length} نموذج دردشة
+                          {selectedProvider.keyCount > 0 ? `${selectedProvider.verifiedKeyCount} من ${selectedProvider.keyCount} مفاتيح لديها موديلات مختبرة` : 'خدمة مجهولة الهوية'} · {selectedProvider.models.length} نموذجًا مجتازًا
                         </p>
                       </div>
                       <Button variant="outline" size="sm" onClick={() => void fetchModels(true, providerId)} disabled={checkingProviderId === providerId} className="shrink-0 text-xs">
                         {checkingProviderId === providerId ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                        <span className="ml-1">فحص المفتاح</span>
+                        <span className="ml-1">تحديث حالة المفتاح</span>
                       </Button>
                     </div>
                   )}
@@ -451,11 +459,11 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                   {providerStatuses.map((provider) => (
                     <div key={provider.id} className="flex items-center justify-between gap-2 rounded p-2 text-xs hover:bg-white/5">
                       <span className="flex min-w-0 items-center gap-2 truncate">
-                        <span className={`h-2 w-2 shrink-0 rounded-full ${['valid', 'partial', 'available'].includes(provider.status) ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${provider.models.length ? 'bg-emerald-400' : 'bg-rose-400'}`} />
                         <span className="truncate">{provider.name}</span>
                       </span>
                       <span className="shrink-0 text-white/50">
-                        {provider.keyCount ? `${provider.validKeyCount}/${provider.keyCount} · ` : ''}{provider.models.length} نموذج
+                        {provider.keyCount ? `${provider.verifiedKeyCount}/${provider.keyCount} · ` : ''}{provider.models.length} مجتاز
                       </span>
                     </div>
                   ))}

@@ -25,8 +25,19 @@ if (!Array.isArray(listing.models) || !listing.models.some((model) => model.prov
 const statusData = await (await check('/api/providers')).json();
 if (!Array.isArray(statusData.providers)) throw new Error('Expected a provider status list from /api/providers');
 for (const provider of statusData.providers) {
-  if (!Array.isArray(provider.models) || 'apiKeys' in provider || 'key' in provider || 'apiKey' in provider) {
+  if (!Array.isArray(provider.models)
+    || !Number.isInteger(provider.verifiedKeyCount)
+    || 'apiKeys' in provider || 'apiKeyNames' in provider || 'key' in provider || 'apiKey' in provider) {
     throw new Error(`Unsafe or malformed provider response: ${provider.id}`);
+  }
+  if (provider.status === 'no-tested-models' && provider.models.length > 0) {
+    throw new Error(`Provider ${provider.id} exposes models despite a no-tested-models status`);
+  }
+}
+for (const model of listing.models) {
+  const provider = statusData.providers.find((candidate) => candidate.id === model.providerId);
+  if (!provider?.models.some((candidate) => candidate.id === model.id)) {
+    throw new Error(`Unverified chat model exposed in /api/chat: ${model.providerId}/${model.id}`);
   }
 }
 console.log(`Smoke check passed for ${base}: ${listing.models.length} chat model(s), ${statusData.providers.length} safe provider status(es)`);

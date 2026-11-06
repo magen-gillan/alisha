@@ -1,3 +1,5 @@
+import verifiedModelRegistry from './verified-models.json';
+
 /**
  * Server-side LLM router. Credentials are read only from server environment
  * variables and are never returned in provider/model API responses.
@@ -8,6 +10,7 @@ export interface LLMProvider {
   name: string;
   baseUrl: string;
   apiKeys: string[];
+  apiKeyNames: string[];
   models: string[];
   priority: number;
   anonymous?: boolean;
@@ -24,9 +27,10 @@ export interface ChatRequest {
 export interface ProviderStatus {
   id: string;
   name: string;
-  status: 'available' | 'valid' | 'partial' | 'invalid' | 'unavailable';
+  status: 'available' | 'valid' | 'partial' | 'invalid' | 'unavailable' | 'no-tested-models';
   keyCount: number;
   validKeyCount: number;
+  verifiedKeyCount: number;
   models: Array<{ id: string; name: string }>;
 }
 
@@ -76,24 +80,40 @@ const DEFINITIONS: ProviderDefinition[] = [
 
 const MODEL_CACHE_MS = 5 * 60_000;
 const modelCache = new Map<string, { expiresAt: number; result: ProviderStatus }>();
+// Internal only: for each provider/model, retain the exact server-side keys
+// whose authenticated catalog returned that model. Never include this in API output.
+const modelKeyCache = new Map<string, Map<string, string[]>>();
 
-function keysFor(definition: ProviderDefinition): string[] {
-  const values = definition.envNames
-    .map((name) => process.env[name]?.trim())
-    .filter((value): value is string => Boolean(value));
-  return [...new Set(values)];
+const verifiedModels = verifiedModelRegistry as {
+  modelsByKey: Record<string, Record<string, string[]>>;
+  noKeyModels: Record<string, string[]>;
+};
+
+function keysFor(definition: ProviderDefinition): Array<{ name: string; value: string }> {
+  const entries: Array<{ name: string; value: string }> = [];
+  for (const name of definition.envNames) {
+    const value = process.env[name]?.trim();
+    if (!value) continue;
+    entries.push({ name, value });
+  }
+  return entries;
+}
+
+function isVerifiedForKey(providerId: string, keyName: string, modelId: string): boolean {
+  return verifiedModels.modelsByKey[providerId]?.[keyName]?.includes(modelId) ?? false;
 }
 
 /** Only configured providers are included, except the anonymous Pollinations tier. */
 export function buildProviderList(modelsByProvider: Record<string, string[]> = {}): LLMProvider[] {
   return DEFINITIONS.flatMap((definition) => {
-    const apiKeys = keysFor(definition);
-    if (!definition.anonymous && apiKeys.length === 0) return [];
+    const keyEntries = keysFor(definition);
+    if (!definition.anonymous && keyEntries.length === 0) return [];
     return [{
       id: definition.id,
       name: definition.name,
       baseUrl: definition.baseUrl,
-      apiKeys,
+      apiKeys: keyEntries.map((entry) => entry.value),
+      apiKeyNames: keyEntries.map((entry) => entry.name),
       models: modelsByProvider[definition.id] ?? definition.fixedModels ?? [],
       priority: definition.priority,
       anonymous: definition.anonymous,
@@ -191,10 +211,14 @@ async function inspectProvider(provider: LLMProvider, force = false): Promise<Pr
   if (!force && cached && cached.expiresAt > Date.now()) return cached.result;
 
   if (provider.anonymous && provider.apiKeys.length === 0) {
+    const verifiedIds = new Set(verifiedModels.noKeyModels[provider.id] ?? []);
+    const verified = (provider.models.length ? provider.models : ['openai-fast'])
+      .filter((id) => verifiedIds.has(id))
+      .map((id) => ({ id, name: id }));
     const result: ProviderStatus = {
-      id: provider.id, name: provider.name, status: 'available',
-      keyCount: 0, validKeyCount: 0,
-      models: (provider.models.length ? provider.models : ['openai-fast']).map((id) => ({ id, name: id })),
+      id: provider.id, name: provider.name, status: verified.length ? 'available' : 'no-tested-models',
+      keyCount: 0, validKeyCount: 0, verifiedKeyCount: 0,
+      models: verified,
     };
     modelCache.set(provider.id, { expiresAt: Date.now() + MODEL_CACHE_MS, result });
     return result;
@@ -203,15 +227,32 @@ async function inspectProvider(provider: LLMProvider, force = false): Promise<Pr
   const checks = await Promise.all(provider.apiKeys.map((key) => readModelCatalog(provider, key)));
   const valid = checks.filter((check) => check.status >= 200 && check.status < 300);
   const models = new Map<string, { id: string; name: string }>();
-  for (const check of valid) for (const model of check.models) models.set(model.id, model);
+  const keysByModel = new Map<string, string[]>();
+  checks.forEach((check, index) => {
+    if (check.status < 200 || check.status >= 300) return;
+    const keyName = provider.apiKeyNames[index];
+    for (const model of check.models) {
+      if (!isVerifiedForKey(provider.id, keyName, model.id)) continue;
+      models.set(model.id, model);
+      const keys = keysByModel.get(model.id) ?? [];
+      keys.push(keyName);
+      keysByModel.set(model.id, keys);
+    }
+  });
+  modelKeyCache.set(provider.id, keysByModel);
   const mergedModels = [...models.values()].sort((a, b) => a.name.localeCompare(b.name));
   const allDenied = checks.length > 0 && checks.every((check) => check.status === 401 || check.status === 403);
+  const verifiedKeyCount = new Set([...keysByModel.values()].flat()).size;
+  const status: ProviderStatus['status'] = mergedModels.length === 0
+    ? valid.length > 0 ? 'no-tested-models' : allDenied ? 'invalid' : 'unavailable'
+    : valid.length === checks.length && verifiedKeyCount === provider.apiKeys.length ? 'valid' : 'partial';
   const result: ProviderStatus = {
     id: provider.id,
     name: provider.name,
-    status: valid.length === checks.length ? 'valid' : valid.length > 0 ? 'partial' : allDenied ? 'invalid' : 'unavailable',
+    status,
     keyCount: provider.apiKeys.length,
     validKeyCount: valid.length,
+    verifiedKeyCount,
     models: mergedModels,
   };
   modelCache.set(provider.id, { expiresAt: Date.now() + MODEL_CACHE_MS, result });
@@ -229,8 +270,20 @@ export async function listProviderStatuses(options: { providerId?: string; force
 export async function getSelectedProvider(providerId: string, modelId: string): Promise<LLMProvider | null> {
   const status = (await listProviderStatuses({ providerId }))[0];
   if (!status || !status.models.some((model) => model.id === modelId)) return null;
-  return buildProviderList({ [providerId]: status.models.map((model) => model.id) })
-    .find((provider) => provider.id === providerId) ?? null;
+  const provider = buildProviderList({ [providerId]: status.models.map((model) => model.id) })
+    .find((item) => item.id === providerId);
+  if (!provider) return null;
+  if (provider.anonymous) return provider;
+  const eligibleKeys = modelKeyCache.get(providerId)?.get(modelId);
+  if (!eligibleKeys?.length) return null;
+  const eligibleIndexes = provider.apiKeyNames
+    .map((name, index) => eligibleKeys.includes(name) ? index : -1)
+    .filter((index) => index >= 0);
+  return {
+    ...provider,
+    apiKeys: eligibleIndexes.map((index) => provider.apiKeys[index]),
+    apiKeyNames: eligibleIndexes.map((index) => provider.apiKeyNames[index]),
+  };
 }
 
 const cooldowns = new Map<string, number>();
@@ -279,23 +332,27 @@ export async function routeChat(
     const keys: Array<string | undefined> = provider.apiKeys.length ? provider.apiKeys : [undefined];
     let retryMs = 30_000;
     let rateLimited = false;
+    const modernOpenAIModel = provider.id === 'openai' && /^(gpt-5|o1|o3)(-|$)/i.test(model);
 
     for (const apiKey of keys) {
       try {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (apiKey) {
-          if (provider.id === 'google') headers['x-goog-api-key'] = apiKey;
-          else headers.Authorization = `Bearer ${apiKey}`;
+          // Google uses x-goog-api-key for its native REST catalog endpoint,
+          // but its OpenAI-compatible Chat Completions endpoint requires Bearer.
+          headers.Authorization = `Bearer ${apiKey}`;
         }
+        const payload: Record<string, unknown> = {
+          model,
+          messages: req.messages,
+          stream: false,
+          [modernOpenAIModel ? 'max_completion_tokens' : 'max_tokens']:
+            Math.min(Math.max(req.max_tokens ?? 700, 1), 1200),
+        };
+        if (!modernOpenAIModel) payload.temperature = req.temperature ?? 0.7;
         const response = await fetch(`${provider.baseUrl}/chat/completions`, {
           method: 'POST', headers,
-          body: JSON.stringify({
-            model,
-            messages: req.messages,
-            temperature: req.temperature ?? 0.7,
-            max_tokens: Math.min(Math.max(req.max_tokens ?? 700, 1), 1200),
-            stream: false,
-          }),
+          body: JSON.stringify(payload),
           signal,
         });
         if (response.status === 429 || response.status >= 500) {

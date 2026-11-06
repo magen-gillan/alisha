@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     const requestedModel = typeof body.model === 'string' ? body.model : '';
     if (!providerId) return errorResponse('اختر مزودًا من الإعدادات أولًا.', 400);
 
-    const { buildProviderList, getSelectedProvider, listProviderStatuses, routeChat } = await import('@/lib/alisha/llm-router');
+    const { getSelectedProvider, listProviderStatuses, routeChat } = await import('@/lib/alisha/llm-router');
     const providerStatus = (await listProviderStatuses({ providerId }))[0];
     if (!providerStatus || !['valid', 'partial', 'available'].includes(providerStatus.status)) {
       return errorResponse('المزود غير متاح حاليًا. افحص حالة المفتاح أو اختر مزودًا آخر.', 503);
@@ -71,7 +71,6 @@ export async function POST(request: NextRequest) {
     const provider = await getSelectedProvider(providerId, model);
     if (!provider) return errorResponse('النموذج المحدد غير موجود في قائمة هذا المزود.', 400);
 
-    const configured = buildProviderList({ [providerId]: provider.models });
     const result = await routeChat(
       {
         messages,
@@ -80,7 +79,7 @@ export async function POST(request: NextRequest) {
         temperature: typeof body.temperature === 'number' ? Math.min(Math.max(body.temperature, 0), 1.5) : 0.7,
         max_tokens: typeof body.max_tokens === 'number' ? Math.min(Math.max(body.max_tokens, 1), 1200) : 700,
       },
-      configured.filter((item) => item.id === providerId),
+      [provider],
       request.signal,
     );
 

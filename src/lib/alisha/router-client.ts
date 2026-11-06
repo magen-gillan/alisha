@@ -16,9 +16,10 @@ export interface RouterModel {
 export interface RouterProviderStatus {
   id: string;
   name: string;
-  status: 'available' | 'valid' | 'partial' | 'invalid' | 'unavailable';
+  status: 'available' | 'valid' | 'partial' | 'invalid' | 'unavailable' | 'no-tested-models';
   keyCount: number;
   validKeyCount: number;
+  verifiedKeyCount: number;
   models: RouterModel[];
 }
 

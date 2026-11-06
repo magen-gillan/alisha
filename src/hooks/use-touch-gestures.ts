@@ -29,8 +29,13 @@ export function useTouchGestures(options: TouchGesturesOptions = {}) {
       if (event.touches.length === 2 && inAvatar) {
         start.current = null;
         pinch.current = { distance: Math.hypot(event.touches[0].clientX - event.touches[1].clientX, event.touches[0].clientY - event.touches[1].clientY) };
-      } else if (event.touches.length === 1) {
+      } else if (event.touches.length === 1 && !inAvatar) {
+        // One-finger movement inside the avatar viewport is reserved for
+        // dragging the character; it must not cycle the page background.
         start.current = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+        pinch.current = null;
+      } else if (event.touches.length === 1) {
+        start.current = null;
         pinch.current = null;
       } else {
         start.current = null;

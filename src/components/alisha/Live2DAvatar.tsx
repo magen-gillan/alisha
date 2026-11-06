@@ -13,6 +13,8 @@ interface Live2DAvatarProps {
   thinking: boolean;
   avatarId: AvatarId;
   scale: number;
+  offsetX?: number;
+  offsetY?: number;
   onEmotionReady?: (setEmotion: (emotion: Emotion) => void) => void;
 }
 
@@ -39,6 +41,8 @@ export default function Live2DAvatar({
   thinking,
   avatarId,
   scale,
+  offsetX = 0,
+  offsetY = 0,
   onEmotionReady,
 }: Live2DAvatarProps) {
   return (
@@ -50,6 +54,8 @@ export default function Live2DAvatar({
       thinking={thinking}
       avatarId={avatarId}
       scale={scale}
+      offsetX={offsetX}
+      offsetY={offsetY}
       onEmotionReady={onEmotionReady}
     />
   );
@@ -62,6 +68,8 @@ function AvatarInstance({
   thinking,
   avatarId,
   scale,
+  offsetX = 0,
+  offsetY = 0,
   onEmotionReady,
 }: Live2DAvatarProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -70,6 +78,7 @@ function AvatarInstance({
   const modelRef = useRef<any>(null);
   const fitModelRef = useRef<(() => void) | null>(null);
   const scaleRef = useRef(scale);
+  const offsetRef = useRef({ x: offsetX, y: offsetY });
   const [loadState, setLoadState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
   const [errorMsg, setErrorMsg] = useState<string>('');
 
@@ -254,10 +263,11 @@ function AvatarInstance({
           // Use 0.95 multiplier so the model has a small margin.
           const scale = Math.min(cw / mw, ch / mh) * 0.95 * scaleRef.current;
           try { modelRef.current.scale.set(scale); } catch {}
-          // Fixed per-avatar offsets are reapplied after every viewport resize.
+          // User offsets are normalized to the viewport so they remain useful
+          // across phone sizes and are reapplied after every viewport resize.
           try {
-            modelRef.current.x = cw / 2 + avatar.calibration.xOffset;
-            modelRef.current.y = ch / 2 + avatar.calibration.yOffset;
+            modelRef.current.x = cw * (0.5 + offsetRef.current.x) + avatar.calibration.xOffset;
+            modelRef.current.y = ch * (0.5 + offsetRef.current.y) + avatar.calibration.yOffset;
           } catch {}
         };
 
@@ -453,6 +463,11 @@ function AvatarInstance({
     scaleRef.current = scale;
     fitModelRef.current?.();
   }, [scale]);
+
+  useEffect(() => {
+    offsetRef.current = { x: offsetX, y: offsetY };
+    fitModelRef.current?.();
+  }, [offsetX, offsetY]);
   // ---- State-based motion triggers ----
   useEffect(() => {
     if (loadState !== 'ready' || !modelRef.current) return;
