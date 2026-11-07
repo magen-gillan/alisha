@@ -227,8 +227,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Dedicated avatar viewport: slightly under half of the visible screen, leaving room for chat controls/input. */}
-      <section className="relative z-10 h-[46dvh] max-h-[46dvh] min-h-[280px] shrink-0 flex items-center justify-center overflow-hidden">
+      {/* Full-screen avatar canvas. Header, calibration tools and chat controls stay layered above it. */}
+      <section className="absolute inset-0 z-10 flex items-center justify-center overflow-hidden">
         <div
           data-avatar-calibration
           className="relative h-full w-full mx-auto flex items-center justify-center touch-none select-none"
@@ -274,7 +274,7 @@ export default function Home() {
             </Suspense>
           </AlishaErrorBoundary>
           {/* Per-avatar controls; saved drafts remain local to this browser/device. */}
-          <div className="absolute top-2 right-2 z-30 flex flex-col items-end gap-1">
+          <div className="absolute top-24 right-2 z-30 flex flex-col items-end gap-1">
             <div className="flex items-center gap-1 rounded-lg bg-black/55 p-1 shadow-lg">
               <Button size="sm" variant="ghost" onClick={() => adjustAvatarScale(0.9)} aria-label="تصغير الأفاتار" className="h-8 min-w-8 px-2 text-lg text-white hover:bg-white/15">−</Button>
               <span className="min-w-12 text-center text-xs text-white">
@@ -300,7 +300,7 @@ export default function Home() {
               {saveFailed ? 'تعذر الحفظ على هذا الجهاز' : sizeSaved ? 'الحجم والموضع محفوظان محليًا · مؤقت' : 'الحجم والموضع مؤقتان · محليان فقط'}
             </span>
           </div>
-          <div className="pointer-events-none absolute bottom-2 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-[10px] text-white/75">
+          <div className="pointer-events-none absolute bottom-28 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-[10px] text-white/75">
             اسحب الأفاتار لتحريكه · استخدم + و− للتكبير
           </div>
           {/* Audio visualization overlay when Alisha is speaking */}
