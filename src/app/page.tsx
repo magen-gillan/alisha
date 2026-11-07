@@ -324,7 +324,7 @@ export default function Home() {
 
       {/* Bottom controls — fixed height, sits above keyboard */}
       <footer
-        className="relative z-20 flex flex-col items-center gap-2 px-4 pb-3 pt-1 shrink-0"
+        className="absolute inset-x-0 bottom-0 z-20 flex w-full flex-col items-center gap-2 px-4 pb-3 pt-1"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         <StatusBar
