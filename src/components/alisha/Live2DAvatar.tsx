@@ -531,7 +531,7 @@ function AvatarInstance({
     <div
       ref={containerRef}
       onClick={handleTap}
-      data-avatar-calibration
+      data-avatar-canvas
       className="absolute inset-0 overflow-hidden cursor-pointer touch-none"
       aria-label="Alisha avatar"
       role="button"

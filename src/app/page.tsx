@@ -9,7 +9,6 @@ import StatusBar from '@/components/alisha/StatusBar';
 import AlishaErrorBoundary from '@/components/alisha/AlishaErrorBoundary';
 import { Button } from '@/components/ui/button';
 import { Settings, Loader2 } from 'lucide-react';
-import { readAvatarCalibrationDraft, saveAvatarCalibrationDraft, deleteAvatarCalibrationDraft } from '@/lib/alisha/avatar-size-drafts';
 import { getAvatarById } from '@/lib/alisha/avatars';
 import { useAlishaStore } from '@/store/alisha-store';
 import { stopSpeaking } from '@/lib/alisha/speech';
@@ -78,53 +77,27 @@ export default function Home() {
   const [speaking, setSpeaking] = useState(false);
   const [listening, setListening] = useState(false);
   const [thinking, setThinking] = useState(false);
-  const [avatarScale, setAvatarScale] = useState<number | null>(null);
-  const [avatarPosition, setAvatarPosition] = useState({ x: 0, y: 0 });
-  const [sizeSaved, setSizeSaved] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
-  const dragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const { background, responseLanguage, avatarId, setBackground, theme, setTheme } = useAlishaStore();
   const viewportHeight = useVisualViewportHeight();
+  const avatarCalibration = getAvatarById(avatarId).calibration;
 
   // Store the setEmotion function from Live2DAvatar so VoiceChatButton /
   // TextChatButton can trigger emotion changes when the AI responds.
   const setEmotionRef = useRef<((emotion: Emotion) => void) | null>(null);
 
-  const adjustAvatarScale = (factor: number) => {
-    const baseline = getAvatarById(avatarId).calibration.scale;
-    setAvatarScale((current) => {
-      const next = (current ?? baseline) * factor;
-      return Math.max(baseline * 0.3, Math.min(baseline * 4, next));
-    });
-    setSizeSaved(false);
-    setSaveFailed(false);
-  };
-  const resetAvatarCalibration = () => {
-    setAvatarScale(getAvatarById(avatarId).calibration.scale);
-    setAvatarPosition({ x: 0, y: 0 });
-    deleteAvatarCalibrationDraft(avatarId);
-    setSizeSaved(false);
-    setSaveFailed(false);
-  };
-
-  // Horizontal swipes cycle backgrounds; pinches adjust only the selected avatar.
+  // Horizontal swipes cycle backgrounds. Avatar calibration is static and cannot be changed here.
   useTouchGestures({
     onSwipeLeft: () => setBackground(prevBackground(background)),
     onSwipeRight: () => setBackground(nextBackground(background)),
-    onPinch: adjustAvatarScale,
   });
-  // Selection loads this avatar's local saved size; otherwise use static baseline.
+
+  // Remove temporary calibration drafts from earlier builds; fixed values now live in avatars.ts.
   useEffect(() => {
-    // Defer device-local hydration until after this render to avoid cascading updates.
-    const timer = window.setTimeout(() => {
-      const savedCalibration = readAvatarCalibrationDraft(avatarId);
-      setAvatarScale(savedCalibration?.scale ?? getAvatarById(avatarId).calibration.scale);
-      setAvatarPosition({ x: savedCalibration?.x ?? 0, y: savedCalibration?.y ?? 0 });
-      setSizeSaved(false);
-      setSaveFailed(false);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [avatarId]);
+    try {
+      window.localStorage.removeItem('alisha.avatar-size-drafts.v1');
+      window.localStorage.removeItem('alisha.avatar-size-drafts.v2');
+    } catch {}
+  }, []);
 
   // Apply theme class to <html> so global CSS variables can react.
   useEffect(() => {
@@ -227,84 +200,27 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Full-screen avatar canvas. Header, calibration tools and chat controls stay layered above it. */}
+      {/* Full-screen avatar canvas. Header and chat controls stay layered above it. */}
       <section className="absolute inset-0 z-10 flex items-center justify-center overflow-hidden">
         <div
-          data-avatar-calibration
+          data-avatar-canvas
           className="absolute inset-0 touch-none select-none"
-          onPointerDown={(event) => {
-            if ((event.target as HTMLElement).closest('button') || !event.isPrimary) return;
-            dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-            event.currentTarget.setPointerCapture(event.pointerId);
-          }}
-          onPointerMove={(event) => {
-            const previous = dragRef.current;
-            if (!previous || previous.pointerId !== event.pointerId) return;
-            const rect = event.currentTarget.getBoundingClientRect();
-            if (!rect.width || !rect.height) return;
-            const dx = event.clientX - previous.x;
-            const dy = event.clientY - previous.y;
-            const clamp = (value: number) => Math.max(-0.75, Math.min(0.75, value));
-            setAvatarPosition((current) => ({
-              x: clamp(current.x + dx / rect.width),
-              y: clamp(current.y + dy / rect.height),
-            }));
-            dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-            setSizeSaved(false);
-            setSaveFailed(false);
-          }}
-          onPointerUp={(event) => {
-            if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
-          }}
-          onPointerCancel={() => { dragRef.current = null; }}
         >
           <AlishaErrorBoundary label="Avatar">
             <Suspense fallback={<AvatarFallback />}>
               <Live2DAvatar
                 background={background}
-                scale={avatarScale ?? getAvatarById(avatarId).calibration.scale}
+                scale={avatarCalibration.scale}
                 speaking={speaking}
                 listening={listening}
                 thinking={thinking}
                 avatarId={avatarId}
-                offsetX={avatarPosition.x}
-                offsetY={avatarPosition.y}
+                offsetX={avatarCalibration.normalizedX}
+                offsetY={avatarCalibration.normalizedY}
                 onEmotionReady={(fn) => { setEmotionRef.current = fn; }}
               />
             </Suspense>
           </AlishaErrorBoundary>
-          {/* Per-avatar controls; saved drafts remain local to this browser/device. */}
-          <div className="absolute top-24 right-2 z-30 flex flex-col items-end gap-1">
-            <div className="flex items-center gap-1 rounded-lg bg-black/55 p-1 shadow-lg">
-              <Button size="sm" variant="ghost" onClick={() => adjustAvatarScale(0.9)} aria-label="تصغير الأفاتار" className="h-8 min-w-8 px-2 text-lg text-white hover:bg-white/15">−</Button>
-              <span className="min-w-12 text-center text-xs text-white">
-                {((avatarScale ?? getAvatarById(avatarId).calibration.scale) / getAvatarById(avatarId).calibration.scale).toFixed(1)}×
-              </span>
-              <Button size="sm" variant="ghost" onClick={() => adjustAvatarScale(1.1)} aria-label="تكبير الأفاتار" className="h-8 min-w-8 px-2 text-lg text-white hover:bg-white/15">+</Button>
-              <Button size="sm" onClick={() => {
-                const ok = saveAvatarCalibrationDraft(avatarId, {
-                  scale: avatarScale ?? getAvatarById(avatarId).calibration.scale,
-                  x: avatarPosition.x,
-                  y: avatarPosition.y,
-                });
-                setSizeSaved(ok);
-                setSaveFailed(!ok);
-              }} className="bg-fuchsia-600 text-white hover:bg-fuchsia-700" aria-label="حفظ حجم وموضع الأفاتار على هذا الجهاز">
-                حفظ الضبط
-              </Button>
-              <Button size="sm" variant="ghost" onClick={resetAvatarCalibration} aria-label="إعادة ضبط حجم وموضع الأفاتار إلى الحجم الأصلي" className="h-8 px-2 text-xs text-white/80 hover:bg-white/15">
-                إعادة الضبط
-              </Button>
-            </div>
-            <span className="rounded bg-black/55 px-2 py-1 text-[10px] text-white">
-              {saveFailed ? 'تعذر الحفظ على هذا الجهاز' : sizeSaved ? 'الحجم والموضع محفوظان محليًا · مؤقت' : 'الحجم والموضع مؤقتان · محليان فقط'}
-              {' · '}
-              {`s=${(avatarScale ?? getAvatarById(avatarId).calibration.scale).toFixed(2)} x=${avatarPosition.x.toFixed(3)} y=${avatarPosition.y.toFixed(3)}`}
-            </span>
-          </div>
-          <div className="pointer-events-none absolute bottom-28 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-[10px] text-white/75">
-            اسحب الأفاتار لتحريكه · استخدم + و− للتكبير
-          </div>
           {/* Audio visualization overlay when Alisha is speaking */}
           {speaking && (
             <div className="pointer-events-none absolute inset-x-0 bottom-2 flex items-end justify-center gap-1 h-10 z-20" aria-hidden="true">

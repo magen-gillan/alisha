@@ -23,8 +23,14 @@ export interface AvatarModel {
   emoji?: string;
   /** Optional thumbnail image URL (small preview shown in the picker). */
   thumbnailUrl?: string;
-  /** Fixed display calibration, applied by the renderer and not user-editable. */
-  calibration: { scale: number; xOffset: number; yOffset: number };
+  /** Fixed display calibration. normalizedX/Y are viewport-relative and non-editable. */
+  calibration: {
+    scale: number;
+    xOffset: number;
+    yOffset: number;
+    normalizedX: number;
+    normalizedY: number;
+  };
   /**
    * MOC3 format version this model uses. The bundled Cubism Core
    * (v5, 2024+) supports versions 1-5. Older cores (2019) only support
@@ -41,7 +47,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Cubism 4 Sample',
     emoji: '👧',
     thumbnailUrl: '/live2d/thumbnails/kei-gallery.webp',
-    calibration: { scale: 1, xOffset: 0, yOffset: 0 },
+    calibration: { scale: 1.31, xOffset: 0, yOffset: 0, normalizedX: -0.029, normalizedY: -0.105 },
     moc3Version: 5,
   },
   {
@@ -51,7 +57,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Chinese-style avatar',
     emoji: '🧝',
     thumbnailUrl: '/live2d/thumbnails/jane-gallery.webp',
-    calibration: { scale: 1, xOffset: 0, yOffset: 0 },
+    calibration: { scale: 1.97, xOffset: 0, yOffset: 0, normalizedX: 0.050, normalizedY: 0.341 },
     moc3Version: 5,
   },
   {
@@ -61,7 +67,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Ice-themed avatar',
     emoji: '❄️',
     thumbnailUrl: '/live2d/thumbnails/icegirl.png',
-    calibration: { scale: 1, xOffset: 0, yOffset: 0 },
+    calibration: { scale: 3.45, xOffset: 0, yOffset: 0, normalizedX: 0.014, normalizedY: 0.622 },
     moc3Version: 4,
   },
   {
@@ -71,7 +77,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Genshin Impact style',
     emoji: '🐉',
     thumbnailUrl: '/live2d/thumbnails/ganyu-gallery.webp',
-    calibration: { scale: 1, xOffset: 0, yOffset: 0 },
+    calibration: { scale: 1.95, xOffset: 0, yOffset: 0, normalizedX: -0.006, normalizedY: 0.251 },
     moc3Version: 4,
   },
   {
@@ -81,7 +87,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Pro avatar with motions',
     emoji: '✨',
     thumbnailUrl: '/live2d/thumbnails/miara-gallery.webp',
-    calibration: { scale: 1, xOffset: 0, yOffset: 0 },
+    calibration: { scale: 1.82, xOffset: 0, yOffset: 0, normalizedX: 0.012, normalizedY: 0.105 },
     moc3Version: 3,
   },
 ];
