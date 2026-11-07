@@ -157,6 +157,16 @@ function AvatarInstance({
     let resizeObserver: ResizeObserver | null = null;
     let onResize: (() => void) | null = null;
 
+    // Always returns the full visible area. Falls back to the window size if
+    // the container ever collapses (this is what made the avatar area tiny).
+    function measureViewport() {
+      const r = containerRef.current?.getBoundingClientRect();
+      const vv = window.visualViewport;
+      const w = r && r.width > 100 ? r.width : (vv?.width ?? window.innerWidth);
+      const h = r && r.height > 100 ? r.height : (vv?.height ?? window.innerHeight);
+      return { w: Math.round(w), h: Math.round(h) };
+    }
+
     async function init() {
       if (!canvasRef.current || !containerRef.current) return;
       setLoadState('loading');
@@ -195,9 +205,8 @@ function AvatarInstance({
 
         if (cancelled) return;
 
-        // 3) Create PIXI application
-        const cw0 = containerRef.current.clientWidth || 512;
-        const ch0 = containerRef.current.clientHeight || 512;
+        // 3) Create PIXI application (sized to the full visible screen)
+        const { w: cw0, h: ch0 } = measureViewport();
         const app = new PIXI.Application({
           view: canvasRef.current,
           autoStart: true,
@@ -249,27 +258,25 @@ function AvatarInstance({
         //    anchored to the bottom, slightly larger than container
         const fitModel = () => {
           if (!modelRef.current || !containerRef.current || !pixiAppRef.current) return;
-          const cw = containerRef.current.clientWidth;
-          const ch = containerRef.current.clientHeight;
+          const { w: cw, h: ch } = measureViewport();
           if (!cw || !ch) return;
 
           try { pixiAppRef.current.renderer.resize(cw, ch); } catch {}
+          // PIXI autoDensity writes fixed px sizes on the canvas; force it back
+          // to cover the whole container so it can never end up as a small box.
+          const cv = canvasRef.current;
+          if (cv) { cv.style.width = '100%'; cv.style.height = '100%'; }
 
           const internal = modelRef.current.internalModel;
           const mw = internal?.originalWidth || modelRef.current.originalWidth || internal?.canvasWidth || 1024;
           const mh = internal?.originalHeight || modelRef.current.originalHeight || internal?.canvasHeight || 1024;
 
-          // Portrait-aware fit: on tall phone screens the character fills most
-          // of the container's height (matching the large framing the user drew)
-          // rather than being width-constrained into a tiny center figurine.
-          const isPortrait = ch > cw;
-          const baseScale = isPortrait
-            ? Math.min((ch / mh) * 1.05, (cw / mw) * 1.6)
-            : Math.min(cw / mw, ch / mh) * 0.95;
+          // "Contain" fit: at 1.0x the WHOLE character is visible on screen.
+          // The user's zoom multiplies this value.
+          const baseScale = Math.min(cw / mw, ch / mh) * 0.9;
           const scale = baseScale * scaleRef.current;
           try { modelRef.current.scale.set(scale); } catch {}
-          // User offsets are normalized to the viewport so they remain useful
-          // across phone sizes and are reapplied after every viewport resize.
+          // Offsets are normalized to the viewport (fraction of width/height).
           try {
             modelRef.current.x = cw * (0.5 + offsetRef.current.x) + avatar.calibration.xOffset;
             modelRef.current.y = ch * (0.5 + offsetRef.current.y) + avatar.calibration.yOffset;
@@ -525,7 +532,7 @@ function AvatarInstance({
       ref={containerRef}
       onClick={handleTap}
       data-avatar-calibration
-      className="relative w-full h-full flex items-center justify-center overflow-hidden cursor-pointer touch-none"
+      className="absolute inset-0 overflow-hidden cursor-pointer touch-none"
       aria-label="Alisha avatar"
       role="button"
       tabIndex={0}
@@ -574,7 +581,7 @@ function AvatarInstance({
       {/* Canvas — fills container, anchored to bottom */}
       <canvas
         ref={canvasRef}
-        className={`w-full h-full block transition-opacity duration-700 ${
+        className={`absolute inset-0 w-full h-full block transition-opacity duration-700 ${
           loadState === 'ready' ? 'opacity-100' : 'opacity-0'
         }`}
       />

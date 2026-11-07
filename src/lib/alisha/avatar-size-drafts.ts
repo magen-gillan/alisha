@@ -1,6 +1,6 @@
 import type { AvatarId } from './avatars';
 
-const STORAGE_KEY = 'alisha.avatar-size-drafts.v1';
+const STORAGE_KEY = 'alisha.avatar-size-drafts.v2';
 
 export interface AvatarCalibrationDraft {
   scale: number;

@@ -94,7 +94,7 @@ export default function Home() {
     const baseline = getAvatarById(avatarId).calibration.scale;
     setAvatarScale((current) => {
       const next = (current ?? baseline) * factor;
-      return Math.max(baseline * 0.4, Math.min(baseline * 8, next));
+      return Math.max(baseline * 0.3, Math.min(baseline * 4, next));
     });
     setSizeSaved(false);
     setSaveFailed(false);
@@ -231,7 +231,7 @@ export default function Home() {
       <section className="absolute inset-0 z-10 flex items-center justify-center overflow-hidden">
         <div
           data-avatar-calibration
-          className="relative h-full w-full mx-auto flex items-center justify-center touch-none select-none"
+          className="absolute inset-0 touch-none select-none"
           onPointerDown={(event) => {
             if ((event.target as HTMLElement).closest('button') || !event.isPrimary) return;
             dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
@@ -298,6 +298,8 @@ export default function Home() {
             </div>
             <span className="rounded bg-black/55 px-2 py-1 text-[10px] text-white">
               {saveFailed ? 'تعذر الحفظ على هذا الجهاز' : sizeSaved ? 'الحجم والموضع محفوظان محليًا · مؤقت' : 'الحجم والموضع مؤقتان · محليان فقط'}
+              {' · '}
+              {`s=${(avatarScale ?? getAvatarById(avatarId).calibration.scale).toFixed(2)} x=${avatarPosition.x.toFixed(3)} y=${avatarPosition.y.toFixed(3)}`}
             </span>
           </div>
           <div className="pointer-events-none absolute bottom-28 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-[10px] text-white/75">
