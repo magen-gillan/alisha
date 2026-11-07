@@ -26,8 +26,14 @@ export async function GET(request: NextRequest) {
   const providerId = request.nextUrl.searchParams.get('provider') || undefined;
   const force = request.nextUrl.searchParams.get('refresh') === '1';
   const { listProviderStatuses } = await import('@/lib/alisha/llm-router');
-  const providers = await listProviderStatuses({ providerId, force });
-
-  // The response contains only public catalog/status fields; secret values never leave the server.
+  const statuses = await listProviderStatuses({ providerId, force });
+  // Return only providers with usable chat models; keep secrets and diagnostic counts server-side.
+  const providers = statuses
+    .filter((provider) => provider.models.length > 0)
+    .map(({ id, name, models }) => ({
+      id,
+      name,
+      models: models.map(({ id: modelId, name: modelName }) => ({ id: modelId, name: modelName })),
+    }));
   return NextResponse.json({ providers }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
 }

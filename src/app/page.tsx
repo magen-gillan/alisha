@@ -227,8 +227,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Avatar viewport fills all space between the top bar and chat controls. */}
-      <section className="relative z-10 flex-1 flex items-center justify-center min-h-0 overflow-hidden">
+      {/* Dedicated avatar viewport: slightly under half of the visible screen, leaving room for chat controls/input. */}
+      <section className="relative z-10 h-[46dvh] max-h-[46dvh] min-h-[280px] shrink-0 flex items-center justify-center overflow-hidden">
         <div
           data-avatar-calibration
           className="relative h-full w-full mx-auto flex items-center justify-center touch-none select-none"

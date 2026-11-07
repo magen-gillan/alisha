@@ -25,13 +25,11 @@ if (!Array.isArray(listing.models) || !listing.models.some((model) => model.prov
 const statusData = await (await check('/api/providers')).json();
 if (!Array.isArray(statusData.providers)) throw new Error('Expected a provider status list from /api/providers');
 for (const provider of statusData.providers) {
-  if (!Array.isArray(provider.models)
-    || !Number.isInteger(provider.verifiedKeyCount)
+  if (Object.keys(provider).sort().join(',') !== 'id,models,name'
+    || !Array.isArray(provider.models)
+    || provider.models.length === 0
     || 'apiKeys' in provider || 'apiKeyNames' in provider || 'key' in provider || 'apiKey' in provider) {
-    throw new Error(`Unsafe or malformed provider response: ${provider.id}`);
-  }
-  if (provider.status === 'no-tested-models' && provider.models.length > 0) {
-    throw new Error(`Provider ${provider.id} exposes models despite a no-tested-models status`);
+    throw new Error(`Unsafe, malformed, or unavailable provider response: ${provider.id}`);
   }
 }
 for (const model of listing.models) {

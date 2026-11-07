@@ -74,7 +74,6 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
   const [previewingVoice, setPreviewingVoice] = useState(false);
   const [providerStatuses, setProviderStatuses] = useState<RouterProviderStatus[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
-  const [checkingProviderId, setCheckingProviderId] = useState('');
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [providersLoaded, setProvidersLoaded] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -86,25 +85,18 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
 
   useEffect(() => { clearLegacyProviderKeys(); }, []);
 
-  const fetchModels = async (force = false, onlyProviderId?: string) => {
-    if (onlyProviderId) setCheckingProviderId(onlyProviderId);
-    else setLoadingModels(true);
+  const fetchModels = async (force = false) => {
+    setLoadingModels(true);
     try {
-      const list = await listRouterProviders({ providerId: onlyProviderId, force });
-      setProviderStatuses((current) => {
-        if (!onlyProviderId) return list;
-        const merged = new Map(current.map((provider) => [provider.id, provider]));
-        for (const provider of list) merged.set(provider.id, provider);
-        return [...merged.values()];
-      });
+      const list = await listRouterProviders({ force });
+      setProviderStatuses(list);
       setProvidersLoaded(true);
 
       const currentSettings = useAlishaStore.getState();
-      const isUsable = (provider: RouterProviderStatus) => provider.models.length > 0
-        && ['valid', 'partial', 'available'].includes(provider.status);
+      const isUsable = (provider: RouterProviderStatus) => provider.models.length > 0;
       const selected = list.find((provider) => provider.id === currentSettings.providerId && isUsable(provider))
         || list.find(isUsable);
-      if (selected && selected.models.length > 0 && ['valid', 'partial', 'available'].includes(selected.status)) {
+      if (selected && selected.models.length > 0) {
         if (selected.id !== currentSettings.providerId) {
           setProviderId(selected.id);
           setModel(selected.models[0]?.id || '');
@@ -115,8 +107,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     } catch (err: any) {
       toast.error(err?.message || 'تعذر فحص مزودي النماذج.');
     } finally {
-      if (onlyProviderId) setCheckingProviderId('');
-      else setLoadingModels(false);
+      setLoadingModels(false);
     }
   };
 
@@ -135,9 +126,8 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
     }, 900);
   };
 
-  const activeProviders = providerStatuses.filter((provider) => provider.models.length > 0
-    && ['valid', 'partial', 'available'].includes(provider.status));
-  const selectedProvider = providerStatuses.find((provider) => provider.id === providerId);
+  const activeProviders = providerStatuses.filter((provider) => provider.models.length > 0);
+  const selectedProvider = activeProviders.find((provider) => provider.id === providerId);
   const selectedModel = selectedProvider?.models.find((item) => item.id === model);
 
   return (
@@ -357,56 +347,45 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
           {activeTab === 'keys' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-base font-semibold">المزود والنموذج</h2>
-                  <p className="text-xs text-white/60">{activeProviders.length} مزود يعمل من {providerStatuses.length} مهيأ</p>
-                </div>
+                <h2 className="text-base font-semibold">المفاتيح والموديلات المتاحة</h2>
                 <Button variant="outline" size="sm" onClick={() => void fetchModels(true)} disabled={loadingModels} className="h-8 text-xs">
                   {loadingModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                  <span className="ml-1">تحديث حالة النماذج</span>
+                  <span className="ml-1">تحديث</span>
                 </Button>
               </div>
 
               <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs leading-5 text-white/70">
-                مفاتيح API محفوظة على الخادم ولا تظهر في الصفحة. الموديلات المعروضة اجتازت طلب دردشة قصيرًا على المفتاح المرتبط بها؛ اختيار المزود والنموذج محفوظ على هذا الجهاز. عند تغيير المفتاح يجب إعادة اختبار الموديلات.
+                تظهر المفاتيح العاملة وموديلاتها المتاحة فقط. تبقى قيم المفاتيح سرية على الخادم.
               </p>
 
-              {providerStatuses.length === 0 && !loadingModels ? (
+              {activeProviders.length === 0 && !loadingModels ? (
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
-                  لا توجد مزودات مهيأة على الخادم حتى الآن. حدّث الصفحة بعد إضافة مفاتيح الخادم.
+                  لا توجد مفاتيح عاملة أو موديلات متاحة حالياً.
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">نوع المزود</Label>
+                    <Label className="text-sm font-medium">المفتاح / المزود</Label>
                     <Select value={providerId} onValueChange={(id) => {
-                      const nextProvider = providerStatuses.find((item) => item.id === id);
+                      const nextProvider = activeProviders.find((item) => item.id === id);
                       setProviderId(id);
                       setModel(nextProvider?.models[0]?.id || '');
                     }}>
                       <SelectTrigger className="w-full"><SelectValue placeholder="اختر المزود" /></SelectTrigger>
                       <SelectContent>
-                        {providerStatuses.map((provider) => (
-                          <SelectItem key={provider.id} value={provider.id} disabled={provider.models.length === 0}>
-                            {provider.name} · {provider.models.length} نموذج مجتاز
-                          </SelectItem>
+                        {activeProviders.map((provider) => (
+                          <SelectItem key={provider.id} value={provider.id}>{provider.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {selectedProvider && selectedProvider.models.length === 0 && (
-                    <div className="rounded-lg border border-amber-400/20 bg-amber-400/10 p-3 text-xs leading-5 text-amber-100/90">
-                      لم ينجح أي نموذج لهذا المزود في اختبار دردشة فعلي، لذلك لن يظهر في قائمة الاختيار. قد يكون السبب رصيدًا غير متاح أو حدّ طلبات أو عدم دعم النموذج.
-                    </div>
-                  )}
-
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">نموذج الدردشة</Label>
+                    <Label className="text-sm font-medium">الموديلات المتاحة</Label>
                     <Popover open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
                       <PopoverTrigger asChild>
                         <Button variant="outline" role="combobox" aria-expanded={modelPickerOpen} className="w-full justify-between border-white/15 bg-black/20 text-white">
-                          <span className="truncate">{selectedModel?.name || selectedModel?.id || 'اختر نموذجًا'}</span>
+                          <span className="truncate">{selectedModel?.name || selectedModel?.id || 'اختر نموذجاً'}</span>
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
@@ -414,7 +393,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                         <Command>
                           <CommandInput placeholder="ابحث عن نموذج..." />
                           <CommandList className="max-h-64">
-                            <CommandEmpty>لا توجد نماذج مطابقة.</CommandEmpty>
+                            <CommandEmpty>لا توجد موديلات متاحة.</CommandEmpty>
                             <CommandGroup>
                               {(selectedProvider?.models || []).map((item) => (
                                 <CommandItem key={item.id} value={`${item.name} ${item.id}`} onSelect={() => {
@@ -433,46 +412,22 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                     </Popover>
                   </div>
 
-                  {selectedProvider && (
-                    <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 p-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          <span className={`h-2 w-2 rounded-full ${selectedProvider.models.length ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                          {selectedProvider.status === 'valid' ? 'الموديلات المختبرة متاحة' : selectedProvider.status === 'partial' ? 'بعض المفاتيح لديها موديلات مختبرة' : selectedProvider.status === 'available' ? 'متاح دون مفتاح' : selectedProvider.status === 'invalid' ? 'المفتاح مرفوض' : selectedProvider.status === 'no-tested-models' ? 'لا يوجد موديل اجتاز اختبار الدردشة' : 'تعذر الاتصال'}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">المفاتيح العاملة وموديلاتها</Label>
+                    <div className="max-h-64 space-y-3 overflow-y-auto rounded-md border border-white/10 bg-black/20 p-3">
+                      {activeProviders.map((provider) => (
+                        <div key={provider.id} className="space-y-1">
+                          <p className="text-sm font-medium">{provider.name}</p>
+                          <p className="text-xs leading-5 text-white/65">{provider.models.map((item) => item.id).join('، ')}</p>
                         </div>
-                        <p className="mt-1 text-xs text-white/55">
-                          {selectedProvider.keyCount > 0 ? `${selectedProvider.verifiedKeyCount} من ${selectedProvider.keyCount} مفاتيح لديها موديلات مختبرة` : 'خدمة مجهولة الهوية'} · {selectedProvider.models.length} نموذجًا مجتازًا
-                        </p>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => void fetchModels(true, providerId)} disabled={checkingProviderId === providerId} className="shrink-0 text-xs">
-                        {checkingProviderId === providerId ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                        <span className="ml-1">تحديث حالة المفتاح</span>
-                      </Button>
+                      ))}
+                      {loadingModels && <div className="text-xs text-white/50">جارٍ تحديث الموديلات...</div>}
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">حالة المزودات</Label>
-                <div className="max-h-52 space-y-1 overflow-y-auto rounded-md border border-white/10 bg-black/20 p-2">
-                  {providerStatuses.map((provider) => (
-                    <div key={provider.id} className="flex items-center justify-between gap-2 rounded p-2 text-xs hover:bg-white/5">
-                      <span className="flex min-w-0 items-center gap-2 truncate">
-                        <span className={`h-2 w-2 shrink-0 rounded-full ${provider.models.length ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                        <span className="truncate">{provider.name}</span>
-                      </span>
-                      <span className="shrink-0 text-white/50">
-                        {provider.keyCount ? `${provider.verifiedKeyCount}/${provider.keyCount} · ` : ''}{provider.models.length} مجتاز
-                      </span>
-                    </div>
-                  ))}
-                  {loadingModels && <div className="p-2 text-xs text-white/50">جارٍ فحص المزودات...</div>}
-                </div>
-              </div>
             </div>
           )}
-
           {/* Save button */}
           <div className="sticky bottom-0 z-10 mt-6 space-y-2 border-t border-white/10 bg-[#241b35]/95 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
             <Button onClick={handleSave} className="w-full bg-gradient-to-r from-fuchsia-500 to-violet-600 text-white shadow-lg shadow-fuchsia-900/30 hover:from-fuchsia-400 hover:to-violet-500">
