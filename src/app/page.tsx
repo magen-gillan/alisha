@@ -23,6 +23,10 @@ import type { Emotion } from '@/lib/alisha/emotion';
 // avatar section actually renders.
 const Live2DAvatar = lazy(() => import('@/components/alisha/Live2DAvatar'));
 
+// Lazy-load Avatar3D the same way — three.js (~650KB) only loads when the
+// user actually selects the 3D avatar in the settings panel.
+const Avatar3D = lazy(() => import('@/components/alisha/Avatar3D'));
+
 function AvatarFallback() {
   return (
     <div className="absolute inset-0 flex items-center justify-center">
@@ -128,7 +132,7 @@ export default function Home() {
   // Global keyboard shortcuts:
   //   Ctrl/Cmd + ,  → open settings (matches most apps)
   //   Ctrl/Cmd + Enter → close settings
-  //   1..5 → switch avatar (Kei/Jane/IceGirl/GanYu/Miara)
+  //   1..6 → switch avatar (Kei/Jane/IceGirl/GanYu/Miara/Alisha3D)
   //   b    → cycle background
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -150,10 +154,10 @@ export default function Home() {
         setSettingsOpen(false);
         return;
       }
-      // 1..5 → switch avatar (only when settings panel is closed to avoid
+      // 1..6 → switch avatar (only when settings panel is closed to avoid
       // clashing with native shortcuts when typing keys in the sheet).
-      if (!settingsOpen && !isMod && /^[1-5]$/.test(e.key)) {
-        const ids = ['kei', 'jane', 'icegirl', 'ganyu', 'miara'] as const;
+      if (!settingsOpen && !isMod && /^[1-6]$/.test(e.key)) {
+        const ids = ['kei', 'jane', 'icegirl', 'ganyu', 'miara', 'alisha3d'] as const;
         const idx = parseInt(e.key, 10) - 1;
         if (idx < ids.length) {
           useAlishaStore.getState().setAvatarId(ids[idx]);
@@ -207,19 +211,32 @@ export default function Home() {
           className="absolute inset-0 touch-none select-none"
         >
           <AlishaErrorBoundary label="Avatar">
-            <Suspense fallback={<AvatarFallback />}>
-              <Live2DAvatar
-                background={background}
-                scale={avatarCalibration.scale}
-                speaking={speaking}
-                listening={listening}
-                thinking={thinking}
-                avatarId={avatarId}
-                offsetX={avatarCalibration.normalizedX}
-                offsetY={avatarCalibration.normalizedY}
-                onEmotionReady={(fn) => { setEmotionRef.current = fn; }}
-              />
-            </Suspense>
+            {avatarId === 'alisha3d' ? (
+              /* Three.js 3D avatar (Mobile Legends lobby style). Renders the
+                 GLB from /models/alisha-3d.glb with auto material repair. */
+              <Suspense fallback={<AvatarFallback />}>
+                <Avatar3D
+                  speaking={speaking}
+                  listening={listening}
+                  thinking={thinking}
+                  onEmotionReady={(fn) => { setEmotionRef.current = fn; }}
+                />
+              </Suspense>
+            ) : (
+              <Suspense fallback={<AvatarFallback />}>
+                <Live2DAvatar
+                  background={background}
+                  scale={avatarCalibration.scale}
+                  speaking={speaking}
+                  listening={listening}
+                  thinking={thinking}
+                  avatarId={avatarId}
+                  offsetX={avatarCalibration.normalizedX}
+                  offsetY={avatarCalibration.normalizedY}
+                  onEmotionReady={(fn) => { setEmotionRef.current = fn; }}
+                />
+              </Suspense>
+            )}
           </AlishaErrorBoundary>
           {/* Audio visualization overlay when Alisha is speaking */}
           {speaking && (

@@ -14,10 +14,13 @@ export type BackgroundId = 'aurora' | 'sunset' | 'midnight' | 'sakura';
 export type AppTheme = 'dark' | 'light';
 
 /**
- * Which Live2D avatar to render. Multiple models can coexist in
+ * Which avatar to render. Multiple Live2D models can coexist in
  * /public/live2d/. Switching is done at runtime in the settings panel.
+ *
+ * `alisha3d` is the Three.js-based 3D avatar (Mobile Legends lobby style)
+ * rendered from /public/models/alisha-3d.glb.
  */
-export type AvatarId = 'kei' | 'jane' | 'icegirl' | 'ganyu' | 'miara';
+export type AvatarId = 'kei' | 'jane' | 'icegirl' | 'ganyu' | 'miara' | 'alisha3d';
 
 /**
  * Which AI provider to use for text generation.

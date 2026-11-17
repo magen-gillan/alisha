@@ -67,7 +67,13 @@ export default class AlishaErrorBoundary extends React.Component<Props, State> {
         </div>
       );
     }
-    // Use resetKey as the key prop so children are fully remounted on reset
-    return <div key={this.state.resetKey}>{this.props.children}</div>;
+    // Use resetKey as the key prop so children are fully remounted on reset.
+    // The wrapper must stretch (h-full w-full) or percentage-height children
+    // (avatar canvases) collapse to their content height.
+    return (
+      <div key={this.state.resetKey} className="h-full w-full">
+        {this.props.children}
+      </div>
+    );
   }
 }

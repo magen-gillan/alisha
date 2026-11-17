@@ -61,7 +61,7 @@ const DEFAULTS: AlishaSettings & {
 } = {
   responseLanguage: 'ar',
   background: 'aurora',
-  avatarId: 'kei',
+  avatarId: 'alisha3d',
   theme: 'dark',
   model: '',
   providerId: 'google',

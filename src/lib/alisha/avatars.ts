@@ -8,7 +8,7 @@
  * public/live2d/<id>/<id>.model3.json. Nothing else needs to change.
  */
 
-export type AvatarId = 'kei' | 'jane' | 'icegirl' | 'ganyu' | 'miara';
+export type AvatarId = 'kei' | 'jane' | 'icegirl' | 'ganyu' | 'miara' | 'alisha3d';
 
 export interface AvatarModel {
   /** URL-safe id, also the directory name under /public/live2d/. */
@@ -89,6 +89,17 @@ export const AVATAR_MODELS: AvatarModel[] = [
     thumbnailUrl: '/live2d/thumbnails/miara-gallery.webp',
     calibration: { scale: 1.82, xOffset: 0, yOffset: 0, normalizedX: 0.012, normalizedY: 0.105 },
     moc3Version: 3,
+  },
+  {
+    id: 'alisha3d',
+    name: 'Alisha 3D',
+    modelUrl: '/models/alisha-3d.glb',
+    description: 'أفاتار ثلاثي الأبعاد بأسلوب ملعب Mobile Legends',
+    emoji: '🎮',
+    thumbnailUrl: '/alisha-new-icon.png',
+    // Calibration values are unused by Avatar3D (it auto-frames the model),
+    // kept here so the shared avatar registry shape stays consistent.
+    calibration: { scale: 1, xOffset: 0, yOffset: 0, normalizedX: 0, normalizedY: 0 },
   },
 ];
 
