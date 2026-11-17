@@ -120,7 +120,7 @@ export const useAlishaStore = create<AlishaStore>()(
     }),
     {
       name: 'alisha-settings',
-      version: 13,
+      version: 14,
       partialize: (state) => ({
         responseLanguage: state.responseLanguage,
         background: state.background,
@@ -163,6 +163,12 @@ export const useAlishaStore = create<AlishaStore>()(
           delete persisted.apiKey;
           delete persisted.pollinationsApiKey;
           persisted.providerId = 'google';
+        }
+        if (version < 14) {
+          // v13 → v14: switch everyone to the new 3D avatar once. The picker
+          // in Settings keeps working afterwards (a manual choice is stored
+          // with version ≥ 14 and is never rewritten by this migration).
+          persisted.avatarId = 'alisha3d';
         }
         // Ensure new fields exist
         if (typeof persisted.model !== 'string') persisted.model = '';
