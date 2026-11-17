@@ -62,7 +62,13 @@ export async function POST(request: NextRequest) {
 
     const { getSelectedProvider, listProviderStatuses, routeChat } = await import('@/lib/alisha/llm-router');
     const providerStatus = (await listProviderStatuses({ providerId }))[0];
-    if (!providerStatus || !['valid', 'partial', 'available'].includes(providerStatus.status)) {
+    // A provider is usable for chat if its status is valid/partial/available,
+    // OR if it has at least one model listed (covers the case where the catalog
+    // was briefly rate-limited but fixedModels still produced a model entry).
+    if (!providerStatus || (
+      !['valid', 'partial', 'available'].includes(providerStatus.status) &&
+      providerStatus.models.length === 0
+    )) {
       return errorResponse('المزود غير متاح حاليًا. افحص حالة المفتاح أو اختر مزودًا آخر.', 503);
     }
 
@@ -76,7 +82,10 @@ export async function POST(request: NextRequest) {
         messages,
         providerId,
         model,
-        temperature: typeof body.temperature === 'number' ? Math.min(Math.max(body.temperature, 0), 1.5) : 0.7,
+        // Z.ai accepts temperature only in [0.0, 1.0]; the router will further
+        // clamp for zai, but keep the upper bound at 1.0 here to avoid sending
+        // an out-of-range value into the provider pipeline at all.
+        temperature: typeof body.temperature === 'number' ? Math.min(Math.max(body.temperature, 0), 1.0) : 0.7,
         max_tokens: typeof body.max_tokens === 'number' ? Math.min(Math.max(body.max_tokens, 1), 1200) : 700,
       },
       [provider],

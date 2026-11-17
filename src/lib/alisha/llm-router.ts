@@ -236,10 +236,20 @@ async function inspectProvider(provider: LLMProvider, force = false): Promise<Pr
   const keysByModel = new Map<string, string[]>();
   // For non-anonymous providers that declare fixedModels (e.g. Z.ai flash models
   // which exist at the chat endpoint but are not returned by /models catalog),
-  // merge them into every successful catalog response before verification.
+  // merge them into every catalog response before verification.
+  //
+  // IMPORTANT: For transient failures (429, 5xx, network) we STILL include
+  // fixedModels, because they are pre-verified in verified-models.json and
+  // do not depend on the catalog response. The catalog is for runtime model
+  // discovery, but fixedModels are a static declaration of models that are
+  // known to work. Excluding them when the catalog is briefly unavailable
+  // would block users from chatting even when the chat endpoint itself is
+  // perfectly healthy.
+  //
+  // We only skip a key entirely when it is genuinely bad (401/403).
   const fixedRows = (provider.models ?? []).map((id) => ({ id, name: id }));
   checks.forEach((check, index) => {
-    if (check.status < 200 || check.status >= 300) return;
+    if (check.status === 401 || check.status === 403) return; // key is bad, skip
     const keyName = provider.apiKeyNames[index];
     const catalogModels = [...check.models];
     for (const fixed of fixedRows) {
@@ -257,6 +267,8 @@ async function inspectProvider(provider: LLMProvider, force = false): Promise<Pr
   const mergedModels = [...models.values()].sort((a, b) => a.name.localeCompare(b.name));
   const allDenied = checks.length > 0 && checks.every((check) => check.status === 401 || check.status === 403);
   const verifiedKeyCount = new Set([...keysByModel.values()].flat()).size;
+  // 'partial' is the right status when the catalog was unreachable but
+  // fixedModels gave us something to try — the chat route still accepts it.
   const status: ProviderStatus['status'] = mergedModels.length === 0
     ? valid.length > 0 ? 'no-tested-models' : allDenied ? 'invalid' : 'unavailable'
     : valid.length === checks.length && verifiedKeyCount === provider.apiKeys.length ? 'valid' : 'partial';
@@ -301,25 +313,54 @@ export async function getSelectedProvider(providerId: string, modelId: string): 
   };
 }
 
+// Cooldown is keyed per-model, not per-provider. This lets a user switch
+// to another model on the same provider when one model is rate-limited
+// (e.g. glm-4.6v-flash overloaded but glm-4.5-flash still responds).
 const cooldowns = new Map<string, number>();
 
-function isOnCooldown(providerId: string): boolean {
-  const expiry = cooldowns.get(providerId);
+function cooldownKey(providerId: string, modelId: string): string {
+  return `${providerId}:${modelId}`;
+}
+
+function isOnCooldown(providerId: string, modelId: string): boolean {
+  const expiry = cooldowns.get(cooldownKey(providerId, modelId));
   if (!expiry) return false;
   if (Date.now() > expiry) {
-    cooldowns.delete(providerId);
+    cooldowns.delete(cooldownKey(providerId, modelId));
     return false;
   }
   return true;
 }
 
-function setCooldown(providerId: string, durationMs: number): void {
-  cooldowns.set(providerId, Date.now() + Math.max(durationMs, 5_000));
+function setCooldown(providerId: string, modelId: string, durationMs: number): void {
+  // Clamp to [5s, 60s]: short enough that users can retry quickly,
+  // long enough that we don't hammer an overloaded upstream.
+  const clamped = Math.min(Math.max(durationMs, 5_000), 60_000);
+  cooldowns.set(cooldownKey(providerId, modelId), Date.now() + clamped);
 }
 
 function retryAfterMs(value: string | null): number {
   const seconds = Number.parseInt(value || '', 10);
-  return Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds * 1000, 5 * 60_000) : 30_000;
+  // Default 10s (was 30s) — Z.ai's 1305 "service overloaded" error rarely
+  // includes a Retry-After header, and 30s was blocking users too long.
+  return Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds * 1000, 5 * 60_000) : 10_000;
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    if (signal) {
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
 }
 
 /** Routes a chat request through the selected provider, trying its configured key pool. */
@@ -335,81 +376,98 @@ export async function routeChat(
 
   const diagnostics: string[] = [];
   for (const provider of ordered) {
-    if (isOnCooldown(provider.id)) {
-      diagnostics.push(`${provider.name}: cooldown`);
-      continue;
-    }
     const model = req.model || provider.models[0];
     if (!model) {
       diagnostics.push(`${provider.name}: no chat models`);
       continue;
     }
+    // Per-model cooldown check — does not block sibling models on the same provider.
+    if (isOnCooldown(provider.id, model)) {
+      diagnostics.push(`${provider.name}/${model}: cooldown`);
+      continue;
+    }
     const keys: Array<string | undefined> = provider.apiKeys.length ? provider.apiKeys : [undefined];
-    let retryMs = 30_000;
+    let retryMs = 10_000;
     let rateLimited = false;
     const modernOpenAIModel =
       (provider.id === 'openai' && /^(gpt-5|gpt-6|o1|o3|o4)(-|$)/i.test(model)) ||
       (provider.id === 'openrouter' && /^openai\/(gpt-5|gpt-6|o1|o3|o4)(-|$)/i.test(model));
 
     for (const apiKey of keys) {
-      try {
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (apiKey) {
-          // Google uses x-goog-api-key for its native REST catalog endpoint,
-          // but its OpenAI-compatible Chat Completions endpoint requires Bearer.
-          headers.Authorization = `Bearer ${apiKey}`;
+      // Inner retry loop: on 429/5xx, wait briefly and retry once before giving up.
+      // This absorbs transient "service overloaded" responses (e.g. Z.ai code 1305)
+      // without surfacing an error to the user.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (apiKey) {
+            // Google uses x-goog-api-key for its native REST catalog endpoint,
+            // but its OpenAI-compatible Chat Completions endpoint requires Bearer.
+            headers.Authorization = `Bearer ${apiKey}`;
+          }
+          if (provider.id === 'openrouter') {
+            headers['HTTP-Referer'] = 'https://alisha-puce.vercel.app';
+            headers['X-Title'] = 'Alisha';
+          }
+          const payload: Record<string, unknown> = {
+            model,
+            messages: req.messages,
+            stream: false,
+            [modernOpenAIModel ? 'max_completion_tokens' : 'max_tokens']:
+              Math.min(Math.max(req.max_tokens ?? 700, 1), 1200),
+          };
+          if (!modernOpenAIModel) {
+            // Z.ai accepts temperature in [0.0, 1.0] only; values > 1.0 are rejected.
+            const temp = req.temperature ?? 0.7;
+            payload.temperature = provider.id === 'zai' ? Math.min(Math.max(temp, 0), 1.0) : temp;
+          }
+          if (provider.id === 'zai') {
+            // Disable long reasoning so the final answer lands directly in `content`
+            // instead of being split into `reasoning_content`. Faster responses.
+            payload.thinking = { type: 'disabled' };
+          }
+          const response = await fetch(`${provider.baseUrl}/chat/completions`, {
+            method: 'POST', headers,
+            body: JSON.stringify(payload),
+            signal,
+          });
+          if (response.status === 429 || response.status >= 500) {
+            if (response.status === 429) rateLimited = true;
+            retryMs = retryAfterMs(response.headers.get('retry-after'));
+            if (attempt === 0) {
+              // Brief backoff then retry once on the same key.
+              await sleep(1_500, signal);
+              continue;
+            }
+            break; // out of attempt loop, fall through to "try next key" (continue below)
+          }
+          if (!response.ok) {
+            diagnostics.push(`${provider.name}: HTTP ${response.status}`);
+            if (response.status === 401 || response.status === 403) break;
+            break;
+          }
+          const data = await response.json();
+          const text = data?.choices?.[0]?.message?.content;
+          if (typeof text !== 'string' || !text.trim()) {
+            diagnostics.push(`${provider.name}: empty response`);
+            break;
+          }
+          return { text: text.trim(), model, provider: provider.name };
+        } catch (error: any) {
+          if (error?.name === 'AbortError') throw error;
+          if (attempt === 0) {
+            // Network blip — try once more before reporting.
+            await sleep(500, signal);
+            continue;
+          }
+          diagnostics.push(`${provider.name}: network error`);
         }
-        if (provider.id === 'openrouter') {
-          headers['HTTP-Referer'] = 'https://alisha-puce.vercel.app';
-          headers['X-Title'] = 'Alisha';
-        }
-        const payload: Record<string, unknown> = {
-          model,
-          messages: req.messages,
-          stream: false,
-          [modernOpenAIModel ? 'max_completion_tokens' : 'max_tokens']:
-            Math.min(Math.max(req.max_tokens ?? 700, 1), 1200),
-        };
-        if (!modernOpenAIModel) {
-          // Z.ai accepts temperature in [0.0, 1.0] only; values > 1.0 are rejected.
-          const temp = req.temperature ?? 0.7;
-          payload.temperature = provider.id === 'zai' ? Math.min(Math.max(temp, 0), 1.0) : temp;
-        }
-        if (provider.id === 'zai') {
-          // Disable long reasoning so the final answer lands directly in `content`
-          // instead of being split into `reasoning_content`. Faster responses.
-          payload.thinking = { type: 'disabled' };
-        }
-        const response = await fetch(`${provider.baseUrl}/chat/completions`, {
-          method: 'POST', headers,
-          body: JSON.stringify(payload),
-          signal,
-        });
-        if (response.status === 429 || response.status >= 500) {
-          if (response.status === 429) rateLimited = true;
-          retryMs = retryAfterMs(response.headers.get('retry-after'));
-          continue;
-        }
-        if (!response.ok) {
-          diagnostics.push(`${provider.name}: HTTP ${response.status}`);
-          if (response.status === 401 || response.status === 403) continue;
-          break;
-        }
-        const data = await response.json();
-        const text = data?.choices?.[0]?.message?.content;
-        if (typeof text !== 'string' || !text.trim()) {
-          diagnostics.push(`${provider.name}: empty response`);
-          break;
-        }
-        return { text: text.trim(), model, provider: provider.name };
-      } catch (error: any) {
-        if (error?.name === 'AbortError') throw error;
-        diagnostics.push(`${provider.name}: network error`);
       }
     }
     if (provider.apiKeys.length > 0 && rateLimited) {
-      setCooldown(provider.id, retryMs);
-      diagnostics.push(`${provider.name}: rate limited`);
+      // Cooldown is per-model so sibling models remain usable.
+      setCooldown(provider.id, model, retryMs);
+      diagnostics.push(`${provider.name}/${model}: rate limited`);
     }
   }
   throw new Error(`تعذر الاتصال بالمزود المحدد. ${diagnostics.join('; ')}`);

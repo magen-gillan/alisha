@@ -207,3 +207,55 @@ Stage Summary:
 - Temperature is automatically clamped to 1.0 for zai so users cannot accidentally trip the >1.0 rejection rule
 - thinking:disabled is sent so chat responses are direct (no reasoning_content split)
 - The key is NOT committed; it lives only in: (a) GitHub Actions secrets, (b) Vercel project env, (c) local .env.local
+
+---
+Task ID: 5
+Agent: main (orchestrator)
+Task: Fix "Z.ai / GLM: cooldown" error reported by user on production site (alisha-puce.vercel.app). Inspect project for programming and logic errors.
+
+Root cause analysis:
+- User screenshots showed: chat input "مرحبا" → error "تعذر الاتصال بالخادم المحدد Z.ai / GLM: cooldown"
+- Direct test against Z.ai API: glm-4.5-flash and glm-4.7-flash respond 200 OK; only glm-4.6v-flash returns 429 (HTTP 429, body code 1305 "service overloaded")
+- So the underlying issue was Z.ai's glm-4.6v-flash being temporarily overloaded, but the in-memory cooldown logic then blocked ALL three Z.ai models on that Vercel instance for 30 seconds, even though two of them were perfectly healthy.
+
+Bugs identified and fixed (all in src/lib/alisha/llm-router.ts unless noted):
+
+1. **Cooldown was per-provider, not per-model** (logic bug, high impact)
+   - Old: `cooldowns: Map<string, number>` keyed by `providerId`. A 429 on glm-4.6v-flash set the cooldown for the entire zai provider, blocking glm-4.5-flash and glm-4.7-flash too.
+   - Fix: key is now `${providerId}:${modelId}`. `isOnCooldown(providerId, modelId)`, `setCooldown(providerId, modelId, durationMs)`. Sibling models remain usable.
+
+2. **Default cooldown was 30s** (too aggressive)
+   - Old: `retryAfterMs()` returned 30_000 when no `Retry-After` header was present.
+   - Z.ai's 1305 error never includes `Retry-After`, so cooldown was always 30s.
+   - Fix: default reduced to 10_000 (10s). `setCooldown` also clamps to [5_000, 60_000] instead of [5_000, ∞).
+
+3. **fixedModels were dropped when the /models catalog returned 429/5xx** (logic bug, high impact)
+   - Old: `if (check.status < 200 || check.status >= 300) return;` skipped the entire key, including the fixedModels merge. So when Z.ai rate-limited the catalog, all three flash models disappeared from the provider status, the chat route returned "المزود غير متاح حاليًا", and no chat could happen.
+   - Fix: only skip on 401/403 (genuine auth failure). For 429/5xx, still merge fixedModels — they are pre-verified in verified-models.json and don't depend on the catalog response. Status becomes 'partial' (still accepted by chat route).
+
+4. **No internal retry on transient 429/5xx** (logic bug, medium impact)
+   - Old: a single 429 immediately set the cooldown and gave up.
+   - Fix: `routeChat` now has an inner attempt loop (max 2 attempts). On 429/5xx or network error on attempt 0, wait 1.5s (or 500ms for network errors) and retry once before falling back to the cooldown path. This absorbs transient Z.ai "service overloaded" responses without surfacing an error to the user.
+
+5. **Chat route rejected chat when providerStatus.status was 'unavailable' even if fixedModels had models** (logic bug, medium impact)
+   - Old: `if (!['valid', 'partial', 'available'].includes(providerStatus.status))` rejected the chat even when `providerStatus.models.length > 0`.
+   - Fix: also accept when `providerStatus.models.length > 0`. This is the case where the catalog failed but fixedModels were merged in.
+
+6. **Temperature upper bound was 1.5 in the chat route** (latent bug)
+   - Z.ai rejects temperature > 1.0. The router already clamped for zai, but the chat route was passing values up to 1.5 into the router pipeline.
+   - Fix: chat route now clamps to [0.0, 1.0]. Defensive — protects against future providers with the same constraint.
+
+7. **ESLint config did not ignore .vercel/output** (code-quality bug)
+   - After `vercel build`, the .vercel/output directory contains generated CJS bundles that fail lint (require() imports).
+   - Fix: added `.vercel/**` to eslint.config.mjs ignores.
+
+Validation:
+- `bunx tsc --noEmit` → exit 0, no errors
+- `bun run lint` → exit 0, no errors (after cleaning .vercel/output)
+- Direct API tests confirm two of three Z.ai models respond 200 OK on the live endpoint
+
+Stage Summary:
+- The "cooldown" lock-out is fixed: per-model cooldown means glm-4.6v-flash being overloaded no longer kills glm-4.5-flash / glm-4.7-flash
+- Catalog rate-limit failures no longer block chat: fixedModels are always merged (unless the key is genuinely bad)
+- Transient 429s are absorbed by an internal retry before the cooldown kicks in
+- Default cooldown is 10s instead of 30s, so users recover faster
