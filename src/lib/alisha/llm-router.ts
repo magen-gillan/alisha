@@ -73,8 +73,14 @@ const DEFINITIONS: ProviderDefinition[] = [
   },
   {
     id: 'zai', name: 'Z.ai / GLM',
-    baseUrl: 'https://open.bigmodel.cn/api/paas/v4', priority: 6,
+    // International endpoint (api.z.ai) — compatible with OpenAI API spec.
+    // The Chinese endpoint (open.bigmodel.cn) returns a different catalog
+    // and does not expose the free glm-*-flash models.
+    baseUrl: 'https://api.z.ai/api/paas/v4', priority: 6,
     envNames: ['ZAI_API_KEY', 'GLM_API_KEY'],
+    // Free $0 flash models confirmed working on api.z.ai. These IDs are not
+    // returned by the /models catalog, so we declare them explicitly here.
+    fixedModels: ['glm-4.7-flash', 'glm-4.5-flash', 'glm-4.6v-flash'],
   },
 ];
 
@@ -228,10 +234,18 @@ async function inspectProvider(provider: LLMProvider, force = false): Promise<Pr
   const valid = checks.filter((check) => check.status >= 200 && check.status < 300);
   const models = new Map<string, { id: string; name: string }>();
   const keysByModel = new Map<string, string[]>();
+  // For non-anonymous providers that declare fixedModels (e.g. Z.ai flash models
+  // which exist at the chat endpoint but are not returned by /models catalog),
+  // merge them into every successful catalog response before verification.
+  const fixedRows = (provider.models ?? []).map((id) => ({ id, name: id }));
   checks.forEach((check, index) => {
     if (check.status < 200 || check.status >= 300) return;
     const keyName = provider.apiKeyNames[index];
-    for (const model of check.models) {
+    const catalogModels = [...check.models];
+    for (const fixed of fixedRows) {
+      if (!catalogModels.some((m) => m.id === fixed.id)) catalogModels.push(fixed);
+    }
+    for (const model of catalogModels) {
       if (!isVerifiedForKey(provider.id, keyName, model.id)) continue;
       models.set(model.id, model);
       const keys = keysByModel.get(model.id) ?? [];
@@ -356,7 +370,16 @@ export async function routeChat(
           [modernOpenAIModel ? 'max_completion_tokens' : 'max_tokens']:
             Math.min(Math.max(req.max_tokens ?? 700, 1), 1200),
         };
-        if (!modernOpenAIModel) payload.temperature = req.temperature ?? 0.7;
+        if (!modernOpenAIModel) {
+          // Z.ai accepts temperature in [0.0, 1.0] only; values > 1.0 are rejected.
+          const temp = req.temperature ?? 0.7;
+          payload.temperature = provider.id === 'zai' ? Math.min(Math.max(temp, 0), 1.0) : temp;
+        }
+        if (provider.id === 'zai') {
+          // Disable long reasoning so the final answer lands directly in `content`
+          // instead of being split into `reasoning_content`. Faster responses.
+          payload.thinking = { type: 'disabled' };
+        }
         const response = await fetch(`${provider.baseUrl}/chat/completions`, {
           method: 'POST', headers,
           body: JSON.stringify(payload),

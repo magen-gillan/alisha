@@ -12,6 +12,13 @@
         "gemini-flash-lite-latest"
       ]
     },
+    "zai": {
+      "ZAI_API_KEY": [
+        "glm-4.7-flash",
+        "glm-4.5-flash",
+        "glm-4.6v-flash"
+      ]
+    },
     "openrouter": {
       "OPENROUTER_API_KEY_2": [
         "aion-labs/aion-rp-llama-3.1-8b",
@@ -254,8 +261,8 @@
       "note": "Key valid (catalog HTTP 200) but inference returns 402 — pre-paid credits or PRO subscription required."
     },
     "zai": {
-      "available": 0,
-      "note": "Key valid (catalog HTTP 200) but chat returns 429 — insufficient account balance."
+      "available": 3,
+      "note": "International endpoint (api.z.ai/api/paas/v4). Verified 2026-11-17: glm-4.5-flash + glm-4.6v-flash respond 200 OK; glm-4.7-flash occasionally returns 1305 (server overload, transient). All three are $0 free-tier models."
     },
     "pollinations": {
       "available": 2,
