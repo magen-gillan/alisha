@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
@@ -31,7 +32,7 @@ import {
 import {
   Loader2, RefreshCw, ChevronsUpDown,
   User, Image as ImageIcon, Globe, Brain, MessagesSquare,
-  Volume2, Trash2, CheckCircle2, Save,
+  Volume2, Trash2, CheckCircle2, Save, ScrollText,
 } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -339,6 +340,24 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
                   <Button variant="outline" size="sm" onClick={() => setPermanentMemory(DEFAULT_PERMANENT_MEMORY)} className="text-xs">
                     استعادة الافتراضي
                   </Button>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Credits — CC BY 4.0 attribution for the 3D model */}
+              <AccordionItem value="credits">
+                <AccordionTrigger className="text-base font-semibold">
+                  <span className="flex items-center gap-2"><ScrollText className="w-4 h-4" /> الاعتمادات</span>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-3 pt-2">
+                  <p className="text-xs leading-6 text-white/70">
+                    الشخصية ثلاثية الأبعاد: «Galaxia anime girl» بواسطة Tatenashi —
+                    مرخّصة بموجب CC BY 4.0 (نسخة معدّلة: خامات مضغوطة وتظليل كرتوني).
+                  </p>
+                  <Link href="/credits" target="_blank"
+                    className="inline-flex items-center gap-2 rounded-lg border border-fuchsia-400/30 bg-fuchsia-500/10 px-3 py-1.5 text-xs font-medium text-fuchsia-200 transition-colors hover:bg-fuchsia-500/20">
+                    <ScrollText className="h-3.5 w-3.5" />
+                    صفحة الاعتمادات الكاملة
+                  </Link>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

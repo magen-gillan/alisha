@@ -364,8 +364,17 @@ export default function Avatar3D({
       return;
     }
 
+    // Weak-device adaptation: low deviceMemory or few CPU cores → render at
+    // devicePixelRatio 1 to avoid memory-pressure kills in WebView on phones
+    // like the Honor X6c. The flat toon look hides the resolution loss.
+    const nav = navigator as Navigator & { deviceMemory?: number };
+    const weak =
+      (typeof nav.deviceMemory === 'number' && nav.deviceMemory <= 4) ||
+      (navigator.hardwareConcurrency > 0 && navigator.hardwareConcurrency <= 4);
     const isMobile = window.matchMedia('(pointer: coarse)').matches;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+    renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio, weak ? 1 : isMobile ? 1.5 : 2),
+    );
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NoToneMapping; // keeps flat anime colours true
     host.appendChild(renderer.domElement);
