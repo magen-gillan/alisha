@@ -259,3 +259,34 @@ Stage Summary:
 - Catalog rate-limit failures no longer block chat: fixedModels are always merged (unless the key is genuinely bad)
 - Transient 429s are absorbed by an internal retry before the cooldown kicks in
 - Default cooldown is 10s instead of 30s, so users recover faster
+
+---
+
+## 2026-11-18 — Credits page (CC BY 4.0) + weak-device quality scaling (commit ddbffab)
+
+Scope: finishing the remaining items of the 3D-avatar plan for the Galaxia character
+(the motion work itself shipped earlier in commit 3b0ed1a and was verified live).
+
+Changes:
+1. **`/credits` route** (`src/app/credits/page.tsx`) — required by the CC BY 4.0 license:
+   - "Galaxia anime girl" by Tatenashi, CC BY 4.0, links to the source Sketchfab page
+     and the license, bilingual (AR + EN attribution line), modification note
+     (WebP 2048 textures, toon shader, procedural animation).
+   - Tech credits: Next.js/React, Three.js, PixiJS + pixi-live2d-display.
+2. **Settings panel** — new "الاعتمادات" accordion (ScrollText icon) linking to /credits.
+3. **Avatar3D weak-device adaptation** (plan §5.2 step 9) — render at
+   `devicePixelRatio 1` when `deviceMemory <= 4` or `hardwareConcurrency <= 4`,
+   to avoid WebView memory-pressure kills on low-end phones (Honor X6c target).
+
+Deploy:
+- GitHub push ok (3b0ed1a..ddbffab). Vercel gitSource auto-deploy did NOT fire
+  (same rate-limit issue as before) → used scripts/deploy_vercel_files.py
+  (file upload, 258 files). Deployment dpl_FDC3R4o7pkpFR7WjjwEskT1vTKqi → READY.
+
+Validation (headless Chrome on the live site):
+- `window.__alisha3d` present; sampled yaw 0 → 2.61 → 6.04 → reset (full 360° spin),
+  z oscillating (-0.07..-0.01) → idle turn + step motion confirmed live.
+- /credits returns 200 with attribution content; settings accordion link navigates to it.
+- Old-user migration still works: injected localStorage v13/'kei' → home shows
+  v14/'alisha3d' with the 3D avatar live, no page errors.
+- `bun x tsc --noEmit` clean, eslint clean on changed files, `bun run build` ok (/credits static).
