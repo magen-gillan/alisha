@@ -81,7 +81,7 @@ export default function Home() {
   const [speaking, setSpeaking] = useState(false);
   const [listening, setListening] = useState(false);
   const [thinking, setThinking] = useState(false);
-  const { background, responseLanguage, avatarId, setBackground, theme, setTheme } = useAlishaStore();
+  const { background, responseLanguage, voiceLanguage, voiceURI, speechRate, speechPitch, avatarId, setBackground, theme, setTheme } = useAlishaStore();
   const viewportHeight = useVisualViewportHeight();
   const avatarCalibration = getAvatarById(avatarId).calibration;
 
@@ -216,6 +216,11 @@ export default function Home() {
                  GLB from /models/alisha-3d.glb with auto material repair. */
               <Suspense fallback={<AvatarFallback />}>
                 <Avatar3D
+                  responseLanguage={responseLanguage}
+                  voiceLanguage={voiceLanguage}
+                  voiceURI={voiceURI}
+                  speechRate={speechRate}
+                  speechPitch={speechPitch}
                   speaking={speaking}
                   listening={listening}
                   thinking={thinking}
@@ -226,6 +231,11 @@ export default function Home() {
               <Suspense fallback={<AvatarFallback />}>
                 <Live2DAvatar
                   background={background}
+                  responseLanguage={responseLanguage}
+                  voiceLanguage={voiceLanguage}
+                  voiceURI={voiceURI}
+                  speechRate={speechRate}
+                  speechPitch={speechPitch}
                   scale={avatarCalibration.scale}
                   speaking={speaking}
                   listening={listening}

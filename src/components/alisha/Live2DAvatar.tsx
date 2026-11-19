@@ -5,9 +5,17 @@ import type { BackgroundId, AvatarId } from '@/lib/alisha/types';
 import { getAvatarById } from '@/lib/alisha/avatars';
 import { useCursorFollow } from '@/hooks/use-cursor-follow';
 import { getEmotionParams, blendEmotions, type Emotion } from '@/lib/alisha/emotion';
+import { speak } from '@/lib/alisha/speech';
+import { getAvatarTapAnimation, getTapPhrase, type AvatarTapAnimation } from '@/animations/avatars';
+import type { ResponseLanguage } from '@/lib/alisha/types';
 
 interface Live2DAvatarProps {
   background: BackgroundId;
+  responseLanguage: ResponseLanguage;
+  voiceLanguage: string;
+  voiceURI: string;
+  speechRate: number;
+  speechPitch: number;
   speaking: boolean;
   listening: boolean;
   thinking: boolean;
@@ -36,6 +44,11 @@ interface Live2DAvatarProps {
 
 export default function Live2DAvatar({
   background,
+  responseLanguage,
+  voiceLanguage,
+  voiceURI,
+  speechRate,
+  speechPitch,
   speaking,
   listening,
   thinking,
@@ -49,6 +62,11 @@ export default function Live2DAvatar({
     <AvatarInstance
       key={avatarId}
       background={background}
+      responseLanguage={responseLanguage}
+      voiceLanguage={voiceLanguage}
+      voiceURI={voiceURI}
+      speechRate={speechRate}
+      speechPitch={speechPitch}
       speaking={speaking}
       listening={listening}
       thinking={thinking}
@@ -63,6 +81,11 @@ export default function Live2DAvatar({
 
 function AvatarInstance({
   background,
+  responseLanguage,
+  voiceLanguage,
+  voiceURI,
+  speechRate,
+  speechPitch,
   speaking,
   listening,
   thinking,
@@ -101,6 +124,8 @@ function AvatarInstance({
   // Motion system state
   const motionStateRef = useRef<'idle' | 'speaking' | 'listening' | 'thinking' | 'tap'>('idle');
   const lastIdleMotionRef = useRef(0);
+  const tapIndexRef = useRef(0);
+  const tapAnimationRef = useRef<{ startedAt: number; animation: AvatarTapAnimation } | null>(null);
 
   const setEmotion = useCallback((emotion: Emotion) => {
     targetEmotionRef.current = emotion;
@@ -397,6 +422,22 @@ function AvatarInstance({
               setParameter('ParamEyeLOpen', eyeL);
               setParameter('ParamEyeROpen', eyeR);
 
+              // ---- Ten-profile tap choreography layer ----
+              const tap = tapAnimationRef.current;
+              if (tap) {
+                const age = now - tap.startedAt;
+                const progress = Math.min(1, Math.max(0, age / tap.animation.durationMs));
+                if (progress < 1) {
+                  const pulse = Math.sin(progress * Math.PI);
+                  const profile = tap.animation.live2d;
+                  setParameter('ParamAngleX', cursor.x * 30 + profile.angleX * pulse);
+                  setParameter('ParamAngleY', -cursor.y * 20 + profile.angleY * pulse);
+                  setParameter('ParamBodyAngleX', cursor.x * 10 + profile.bodyAngleX * pulse);
+                  setParameter('ParamMouthForm', profile.mouthForm * pulse);
+                  setParameter('ParamEyeLOpen', Math.max(0.05, Math.min(1.2, eyeL * (profile.eyeScale + (1 - profile.eyeScale) * (1 - pulse)))));
+                  setParameter('ParamEyeROpen', Math.max(0.05, Math.min(1.2, eyeR * (profile.eyeScale + (1 - profile.eyeScale) * (1 - pulse)))));
+                } else tapAnimationRef.current = null;
+              }
               // ---- Auto idle motion trigger (every 8-15s) ----
               // If idle for too long, play a random idle motion
               if (!speakingRef.current && !listeningRef.current && !thinkingRef.current) {
@@ -511,19 +552,15 @@ function AvatarInstance({
   const handleTap = () => {
     if (loadState !== 'ready' || !modelRef.current) return;
     const model = modelRef.current as any;
+    const animation = getAvatarTapAnimation(avatarId, tapIndexRef.current++);
+    tapAnimationRef.current = { startedAt: performance.now(), animation };
+    setEmotion(animation.emotion);
+    speak({ text: getTapPhrase(animation, responseLanguage), language: responseLanguage, voiceLanguage, voiceURI, rate: speechRate, pitch: speechPitch });
     try {
-      // Try Tap motion group first
-      if (model._alishaPlayMotion) {
-        model._alishaPlayMotion('Tap', 0, 3);
-      }
-      // Also try expressions
+      if (model._alishaPlayMotion) model._alishaPlayMotion('Tap', tapIndexRef.current % 3, 3);
       const tryExpression = model.expression;
-      if (typeof tryExpression === 'function') {
-        const n = model.internalModel?.settings?.expressions?.length || 0;
-        if (n > 0 && Math.random() < 0.5) {
-          tryExpression(Math.floor(Math.random() * n));
-        }
-      }
+      const n = model.internalModel?.settings?.expressions?.length || 0;
+      if (typeof tryExpression === 'function' && n > 0) tryExpression(tapIndexRef.current % n);
     } catch {}
   };
 

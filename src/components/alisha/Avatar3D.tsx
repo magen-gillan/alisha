@@ -34,8 +34,16 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Emotion } from '@/lib/alisha/emotion';
+import { speak } from '@/lib/alisha/speech';
+import { getAvatarTapAnimation, getTapPhrase, type AvatarTapAnimation } from '@/animations/avatars';
+import type { ResponseLanguage } from '@/lib/alisha/types';
 
 interface Avatar3DProps {
+  responseLanguage: ResponseLanguage;
+  voiceLanguage: string;
+  voiceURI: string;
+  speechRate: number;
+  speechPitch: number;
   /** True while Web Speech API is reading the response out loud. */
   speaking: boolean;
   /** True while the microphone is open. */
@@ -307,6 +315,11 @@ export default function Avatar3D({
   onEmotionReady,
   modelUrl = '/models/alisha-3d.glb',
   fallbackImage = '/alisha-new-icon.png',
+  responseLanguage,
+  voiceLanguage,
+  voiceURI,
+  speechRate,
+  speechPitch,
 }: Avatar3DProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const speakingRef = useRef(speaking);
@@ -315,6 +328,8 @@ export default function Avatar3D({
   const emotionRef = useRef<Emotion | null>(null);
   const emotionStartRef = useRef(-1);
   const boundaryRef = useRef(0);
+  const tapIndexRef = useRef(0);
+  const tapAnimationRef = useRef<{ startedAt: number; animation: AvatarTapAnimation } | null>(null);
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -661,6 +676,23 @@ export default function Avatar3D({
       gestureArm(ctlL, gL);
       gestureArm(ctlR, gR);
 
+      // Ten distinct touch choreographies layered over the procedural rig.
+      const tap = tapAnimationRef.current;
+      if (tap && model) {
+        const age = performance.now() / 1000 - tap.startedAt;
+        const p = Math.min(1, Math.max(0, age / (tap.animation.durationMs / 1000)));
+        if (p < 1) {
+          const pulse = Math.sin(p * Math.PI);
+          const profile = tap.animation.threeD;
+          model.rotation.y = yaw + profile.yaw * pulse;
+          model.position.y += profile.bob * modelH * pulse;
+          pose(head, profile.headTilt * pulse, 0, 0);
+          const accent = profile.armLift * pulse;
+          gestureArm(ctlL, [accent, profile.wave * pulse, 0, profile.wave * 0.4 * pulse]);
+          gestureArm(ctlR, [accent, -profile.wave * pulse, 0, -profile.wave * 0.4 * pulse]);
+        } else tapAnimationRef.current = null;
+      }
+
       // Emotion gesture: nod for happy/surprised, shake for angry/sad.
       let nod = 0;
       let shake = 0;
@@ -758,6 +790,16 @@ export default function Avatar3D({
     };
   }, [modelUrl]);
 
+  const handleTap = () => {
+    if (!ready) return;
+    const animation = getAvatarTapAnimation('alisha3d', tapIndexRef.current++);
+    tapAnimationRef.current = { startedAt: performance.now() / 1000, animation };
+    const emotion = animation.emotion;
+    const setEmotion = (e: Emotion) => { emotionRef.current = e; emotionStartRef.current = -1; };
+    setEmotion(emotion);
+    speak({ text: getTapPhrase(animation, responseLanguage), language: responseLanguage, voiceLanguage, voiceURI, rate: speechRate, pitch: speechPitch });
+  };
+
   if (failed) {
     return <img src={fallbackImage} alt="Alisha" className="h-full w-full object-contain" />;
   }
@@ -766,7 +808,11 @@ export default function Avatar3D({
     <div
       ref={hostRef}
       aria-label="Alisha 3D avatar"
-      className={`h-full w-full transition-opacity duration-700 ${
+      onClick={handleTap}
+      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleTap(); } }}
+      role="button"
+      tabIndex={0}
+      className={`h-full w-full cursor-pointer transition-opacity duration-700 ${
         ready ? 'opacity-100' : 'opacity-0'
       }`}
     />
