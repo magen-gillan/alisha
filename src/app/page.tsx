@@ -9,7 +9,7 @@ import StatusBar from '@/components/alisha/StatusBar';
 import AlishaErrorBoundary from '@/components/alisha/AlishaErrorBoundary';
 import { Button } from '@/components/ui/button';
 import { Settings, Loader2 } from 'lucide-react';
-import { getAvatarById } from '@/lib/alisha/avatars';
+import { getAvatarById, getAvatarMotion, is3DAvatar, AVATAR_MODELS } from '@/lib/alisha/avatars';
 import { useAlishaStore } from '@/store/alisha-store';
 import { stopSpeaking } from '@/lib/alisha/speech';
 import { cancelChatRequests } from '@/lib/alisha/chat-request';
@@ -84,6 +84,7 @@ export default function Home() {
   const { background, responseLanguage, voiceLanguage, voiceURI, speechRate, speechPitch, avatarId, setBackground, theme, setTheme } = useAlishaStore();
   const viewportHeight = useVisualViewportHeight();
   const avatarCalibration = getAvatarById(avatarId).calibration;
+  const avatarMotion = getAvatarMotion(avatarId);
 
   // Store the setEmotion function from Live2DAvatar so VoiceChatButton /
   // TextChatButton can trigger emotion changes when the AI responds.
@@ -132,7 +133,7 @@ export default function Home() {
   // Global keyboard shortcuts:
   //   Ctrl/Cmd + ,  → open settings (matches most apps)
   //   Ctrl/Cmd + Enter → close settings
-  //   1..6 → switch avatar (Kei/Jane/IceGirl/GanYu/Miara/Alisha3D)
+  //   1..9 → switch avatar (first nine entries of the registry)
   //   b    → cycle background
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -154,10 +155,9 @@ export default function Home() {
         setSettingsOpen(false);
         return;
       }
-      // 1..6 → switch avatar (only when settings panel is closed to avoid
-      // clashing with native shortcuts when typing keys in the sheet).
-      if (!settingsOpen && !isMod && /^[1-6]$/.test(e.key)) {
-        const ids = ['kei', 'jane', 'icegirl', 'ganyu', 'miara', 'alisha3d'] as const;
+      // 1..9 → switch avatar (first nine entries of the registry).
+      if (!settingsOpen && !isMod && /^[1-9]$/.test(e.key)) {
+        const ids = AVATAR_MODELS.slice(0, 9).map((m) => m.id);
         const idx = parseInt(e.key, 10) - 1;
         if (idx < ids.length) {
           useAlishaStore.getState().setAvatarId(ids[idx]);
@@ -211,9 +211,9 @@ export default function Home() {
           className="absolute inset-0 touch-none select-none"
         >
           <AlishaErrorBoundary label="Avatar">
-            {avatarId === 'alisha3d' ? (
-              /* Three.js 3D avatar (Mobile Legends lobby style). Renders the
-                 GLB from /models/alisha-3d.glb with auto material repair. */
+            {is3DAvatar(avatarId) ? (
+              /* Three.js 3D avatar (per-character motion profile). Renders
+                 the avatar's GLB from /models/ with auto material repair. */
               <Suspense fallback={<AvatarFallback />}>
                 <Avatar3D
                   responseLanguage={responseLanguage}
@@ -225,6 +225,8 @@ export default function Home() {
                   listening={listening}
                   thinking={thinking}
                   onEmotionReady={(fn) => { setEmotionRef.current = fn; }}
+                  modelUrl={getAvatarById(avatarId).modelUrl}
+                  motion={avatarMotion}
                 />
               </Suspense>
             ) : (

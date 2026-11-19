@@ -15,12 +15,15 @@ export type AppTheme = 'dark' | 'light';
 
 /**
  * Which avatar to render. Multiple Live2D models can coexist in
- * /public/live2d/. Switching is done at runtime in the settings panel.
+ * /public/live2d/, and 3D avatars in /public/models/.
  *
- * `alisha3d` is the Three.js-based 3D avatar (Mobile Legends lobby style)
- * rendered from /public/models/alisha-3d.glb.
+ * The canonical list lives in lib/alisha/avatars.ts (AVATAR_MODELS registry)
+ * — this alias keeps every consumer in sync with the registry automatically.
+ * The 3D avatars (`*3d`) are Three.js-rendered by components/alisha/Avatar3D.
  */
-export type AvatarId = 'kei' | 'jane' | 'icegirl' | 'ganyu' | 'miara' | 'alisha3d';
+import type { AvatarId as RegistryAvatarId } from '@/lib/alisha/avatars';
+
+export type AvatarId = RegistryAvatarId;
 
 /**
  * Which AI provider to use for text generation.

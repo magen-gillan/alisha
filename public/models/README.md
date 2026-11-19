@@ -1,12 +1,32 @@
 # نماذج الأفاتار ثلاثي الأبعاد (3D Avatar Models)
 
-ضع ملف الأفاتار ثلاثي الأبعاد هنا باسم:
+كل أفاتار 3D يُسجّل في `src/lib/alisha/avatars.ts` (الحقل `kind: '3d'` مع
+`motion` = بروفايل الحركة الخاص به)، وملفه هنا باسم `<id>.glb`:
 
-```
-public/models/alisha-3d.glb
-```
+| الملف | الأفاتار | الحجم | الهيكل | الحركة |
+|---|---|---|---|---|
+| `alisha-3d.glb` | Alisha 3D (Galaxia) | 1.7MB | 135 عظمة VRM | إجرائية كاملة |
+| `zaria.glb` | Zaria 3D | 1.9MB | 127 عظمة VRM | إجرائية كاملة (27 زنبرك شعر) |
+| `akeno.glb` | Akeno 3D | 3.5MB | 55 عظمة Mixamo | إجرائية (محوّلة من unitypackage) |
+| `wanwan.glb` | Wanwan 3D | 1.2MB | 123 عظمة Bip001 | أنيميشنات مدمجة (city_idle / city_action) عبر AnimationMixer |
+| `layla.glb` | Layla 3D | 0.3MB | بلا هيكل | حركة صلبة: دوران/خطوات/نبض تنفس |
+| `girl.glb` | Girl 3D | 1.7MB | بلا هيكل | حركة صلبة |
+| `casual.glb` | Casual 3D | 6.1MB | بلا هيكل | حركة صلبة |
 
-## الموديل الحالي: Galaxia anime girl
+الصور المصغرة لمنتقي الأفاتار في `thumbs/<id>.png` (تولّدت بعارض Three.js محلي).
+
+## تحذير التراخيص (مهم)
+
+- **Galaxia / Zaria / Just-a-Girl / Casual**: تحميلات Sketchfab مجانية —
+  ترخيصها **CC BY 4.0**: النشر يتطلب ذكر المصمم ورابط الترخيص في صفحة
+  Credits (Galaxia موثّقة هناك؛ أضف البقية قبل أي نشر علني).
+- **Layla و Wanwan (Mobile Legends)**: ملكية فكرية لشركة **Moonton** —
+  **ممنوع النشر العلني أو الاستخدام التجاري**، استخدام شخصي غير ربحي فقط.
+  تُستخدم هنا بقرار مالك المشروع وعلى مسؤوليته.
+- **Akeno (High School DxD)**: شخصية أنمي محفوظة الحقوق + نموذج معمول
+  من مجتمع المعجبين — استخدام شخصي فقط، لا تنشر.
+
+## الموديل الأصلي: Galaxia anime girl
 
 - المصدر: [Sketchfab — "Galaxia anime girl" by Tatenashi](https://sketchfab.com/3d-models/galaxia-anime-girl-485f95459fa747fdbe42c87203e1a156)
 - الترخيص: **CC BY 4.0** — يُشترط ذكر التصنيف في صفحة Credits:

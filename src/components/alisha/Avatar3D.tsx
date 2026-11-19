@@ -1,28 +1,28 @@
 'use client';
 
 /**
- * Avatar3D — "Galaxia anime girl" (Tatenashi, CC BY 4.0)
- * https://sketchfab.com/3d-models/galaxia-anime-girl-485f95459fa747fdbe42c87203e1a156
+ * Avatar3D — renders ANY 3D avatar registered in lib/alisha/avatars.ts
+ * (currently: "Galaxia anime girl" / Tatenashi, CC BY 4.0, "anime 1girl
+ * zaria", Akeno (Unity-package conversion), Wanwan + Layla (MLBB lobby
+ * rips), "just a girl", "anime girl casual outfit") with per-character
+ * motion profiles.
  *
  * LIVE-AVATAR MODE — deliberately NOT a free 3D viewer:
  *  - the camera is fixed; the user cannot drag, rotate or zoom the model,
- *  - all motion is generated in code on top of the model's 135 bones:
- *      · idle: breathing, slow head/neck/chest sway, eye drift + glances,
- *        light spring motion on the 35 hair + skirt joints,
- *      · idle showpieces (always running, speech or not): every 11-20s she
- *        turns around herself — a smooth full 360° spin or a half turn out
- *        and back — and every 7-14s she takes a step forward or backward,
- *        on top of a slow standing drift, a side weight shift and a
- *        breathing bob, all applied to the model root,
- *      · speaking: procedural hand gestures (waves, open palms, beat-synced
- *        emphasis) on top of the rhythmical head/neck/chest beats driven by
- *        a non-repeating pseudo-speech wave PLUS the real TTS word
- *        boundaries (`alisha:tts-boundary` events from lib/alisha/speech),
- *      · listening: soft head tilt toward the user, steadier gaze,
- *      · thinking: eyes and head lift slightly,
- *      · emotions (happy/sad/angry/surprised): short nod / head-shake
- *        gestures registered through onEmotionReady.
- *
+ *  - motion is generated in code, three ways depending on the model:
+ *      · procedural (full skeleton, VRM-style bones: Galaxia, Zaria, Akeno):
+ *        breathing, head/neck/chest sway, hair/skirt springs, eye drift,
+ *        idle showpieces (periodic full turns + forward/backward steps),
+ *        speaking hand gestures, listening/thinking poses, emotions,
+ *      · embedded (GLB ships real clips: Wanwan city_idle/city_action):
+ *        an AnimationMixer owns the skeleton; the action clip replays
+ *        periodically and kicks in when speech starts,
+ *      · rigid (no skeleton: Layla, Just-a-Girl, Casual): whole-model
+ *        turns, steps, drifts, bob and a scale-pulse "breathing" illusion,
+ *    all shaped by the per-avatar Avatar3DMotion profile (cadences +
+ *    amplitude multipliers) so every character moves in her own style.
+ *  - speaking also bumps the rhythm via real TTS word boundaries
+ *    (`alisha:tts-boundary` events from lib/alisha/speech).
  * The model has NO morph targets and NO jaw bone (verified), so there is
  * no lip movement — speech is expressed through body language instead.
  * All materials are converted to a 3-step toon ramp with an added rim
@@ -37,6 +37,7 @@ import type { Emotion } from '@/lib/alisha/emotion';
 import { speak } from '@/lib/alisha/speech';
 import { getAvatarTapAnimation, getTapPhrase, type AvatarTapAnimation } from '@/animations/avatars';
 import type { ResponseLanguage } from '@/lib/alisha/types';
+import type { Avatar3DMotion } from '@/lib/alisha/avatars';
 
 interface Avatar3DProps {
   responseLanguage: ResponseLanguage;
@@ -56,23 +57,46 @@ interface Avatar3DProps {
   modelUrl?: string;
   /** Image shown when WebGL or the model fails (default: /alisha-new-icon.png). */
   fallbackImage?: string;
+  /**
+   * Per-character motion profile from the avatar registry. Every 3D avatar
+   * gets her own cadences/amplitudes; see Avatar3DMotion in avatars.ts.
+   */
+  motion?: Avatar3DMotion;
 }
 
-/** Verified against the GLB: every joint name carries a numeric suffix. */
+/** Motion profile used when none is provided (same as the Alisha 3D baseline). */
+const DEFAULT_MOTION: Avatar3DMotion = {
+  spinEvery: [11, 20],
+  turnDur: [2.6, 3.8],
+  fullChance: 0.6,
+  stepEvery: [7, 14],
+  gesture: 1,
+  sway: 1,
+  talk: 1,
+  bob: 1,
+  pulse: 0,
+};
+
+/**
+ * Verified against the GLBs: VRM-style (Galaxia, Zaria) and Mixamo-style
+ * (Akeno). NOTE: GLTFLoader sanitizes node names (strips '.'), so Mixamo's
+ * "UpperArm.L" reaches three.js as "UpperArmL" — the \.? keeps both forms
+ * working regardless of loader version.
+ */
 const BONES = {
-  head: /^J_Bip_C_Head_\d+$/,
-  neck: /^J_Bip_C_Neck_\d+$/,
-  chest: /^J_Bip_C_Chest_\d+$/,
-  upperChest: /^J_Bip_C_UpperChest_\d+$/,
-  hips: /^J_Bip_C_Hips_\d+$/,
-  eyeL: /^J_Adj_L_FaceEye_\d+$/,
-  eyeR: /^J_Adj_R_FaceEye_\d+$/,
-  armUpperL: /^J_Bip_L_UpperArm_\d+$/,
-  armUpperR: /^J_Bip_R_UpperArm_\d+$/,
-  armLowerL: /^J_Bip_L_LowerArm_\d+$/,
-  armLowerR: /^J_Bip_R_LowerArm_\d+$/,
-  handL: /^J_Bip_L_Hand_\d+$/,
-  handR: /^J_Bip_R_Hand_\d+$/,
+  head: /^(J_Bip_C_Head_\d+|Head)$/,
+  neck: /^(J_Bip_C_Neck_\d+|Neck)$/,
+  chest: /^(J_Bip_C_Chest_\d+|Spine1)$/,
+  upperChest: /^(J_Bip_C_UpperChest_\d+|Spine2)$/,
+  hips: /^(J_Bip_C_Hips_\d+|Hips)$/,
+  eyeL: /^(J_Adj_L_FaceEye_\d+|Eye\.?L)$/,
+  eyeR: /^(J_Adj_R_FaceEye_\d+|Eye\.?R)$/,
+  armUpperL: /^(J_Bip_L_UpperArm_\d+|UpperArm\.?L)$/,
+  armUpperR: /^(J_Bip_R_UpperArm_\d+|UpperArm\.?R)$/,
+  armLowerL: /^(J_Bip_L_LowerArm_\d+|Forearm\.?L)$/,
+  armLowerR: /^(J_Bip_R_LowerArm_\d+|Forearm\.?R)$/,
+  handL: /^(J_Bip_L_Hand_\d+|Hand\.?L)$/,
+  handR: /^(J_Bip_R_Hand_\d+|Hand\.?R)$/,
 } as const;
 
 const AXES = [
@@ -124,8 +148,8 @@ function settleArm(
   return { axis: axis.clone(), sign };
 }
 
-/** 23 hair joints + 12 skirt joints — animated as light springs. */
-const SWAY = /^(HairJoint-|J_Sec_[LR]_Skirt)/;
+/** Hair/skirt secondary joints (Galaxia, Zaria) — animated as light springs. */
+const SWAY = /^(HairJoint-|J_Sec_[LR]_Skirt|J_Sec_Hair)/;
 
 /** Materials whose textures need an alpha cutout (GLB ships them OPAQUE). */
 const NEEDS_ALPHA = /_(HAIR|EYE)$/;
@@ -279,7 +303,12 @@ function toToon(src: THREE.Material, ramp: THREE.Texture): THREE.Material {
     color: old.map ? 0xffffff : old.color,
     gradientMap: ramp,
     side: THREE.DoubleSide,
-    alphaTest: cutout && old.map ? 0.35 : 0,
+    // Preserve the GLTF alpha behaviour: MASK materials ship with alphaTest,
+    // BLEND ones (Akeno/Zaria eyelashes etc.) with transparent=true. Galaxia
+    // hair/eye textures carry alpha but ship OPAQUE — the NEEDS_ALPHA rule
+    // adds the cutout they need.
+    transparent: old.transparent,
+    alphaTest: cutout ? 0.35 : old.alphaTest,
   });
   if (old.map) old.map.anisotropy = 4;
 
@@ -320,6 +349,7 @@ export default function Avatar3D({
   voiceURI,
   speechRate,
   speechPitch,
+  motion = DEFAULT_MOTION,
 }: Avatar3DProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const speakingRef = useRef(speaking);
@@ -450,6 +480,15 @@ export default function Avatar3D({
     // Speaking-gesture scheduler.
     let gIdx = Math.floor(Math.random() * GESTURES.length);
     let gStart = 1.5;
+    // Embedded-animation playback (Wanwan): AnimationMixer drives the
+    // skeleton with the GLB's own clips; the procedural rig stands down.
+    let mixer: THREE.AnimationMixer | null = null;
+    let idleAction: THREE.AnimationAction | null = null;
+    let actAction: THREE.AnimationAction | null = null;
+    let actUntil = -1; // clock time the action clip ends (-1 = not playing)
+    let actNext = 8 + Math.random() * 8; // next idle action replay
+    let prevSpeak = false;
+    let baseScale = 1;
 
     const frame = (obj: THREE.Object3D) => {
       const box = new THREE.Box3().setFromObject(obj);
@@ -460,7 +499,10 @@ export default function Avatar3D({
       const targetY = box.min.y + h * 0.78;
       const visH = h * 0.45;
       // On narrow phone screens the shoulder span limits how close we get.
-      const needW = h * 0.3;
+      // Unrigged figures (Layla, Just-a-Girl, Casual) ship in a bind T-pose:
+      // their arm span (size.x) is much wider than the torso, so the frame
+      // must cover it or the hands get cropped at the screen edges.
+      const needW = Math.max(h * 0.3, size.x * 1.05);
       const span = Math.max(visH, needW / camera.aspect);
       const dist = span / 2 / Math.tan(fov / 2);
       const center = box.getCenter(new THREE.Vector3());
@@ -544,6 +586,25 @@ export default function Avatar3D({
 
         scene.add(model);
         resize();
+
+        baseScale = model.scale.x || 1;
+
+        // Embedded clips (Wanwan lobby GLB): loop the idle clip and keep the
+        // action clip ready for scheduled replays / speech emphasis.
+        if (motion.embedded && gltf.animations.length > 0) {
+          mixer = new THREE.AnimationMixer(model);
+          const clips = gltf.animations;
+          const idleClip = clips.find((c) => /idle/i.test(c.name)) ?? clips[0];
+          const actClip = clips.find((c) => c !== idleClip);
+          idleAction = mixer.clipAction(idleClip);
+          idleAction.play();
+          if (actClip) {
+            actAction = mixer.clipAction(actClip);
+            actAction.setLoop(THREE.LoopOnce, 1);
+            actAction.clampWhenFinished = true;
+          }
+        }
+
         // Read-only debug handle used by smoke tests.
         (window as unknown as Record<string, unknown>).__alisha3d = {
           yaw: () => (model ? model.rotation.y : 0),
@@ -551,6 +612,13 @@ export default function Avatar3D({
           armR: () =>
             ctlR ? ctlR.upper.bone.quaternion.angleTo(ctlR.upper.rest) : 0,
           turning: () => turnStart >= 0,
+          mode: mixer ? 'embedded' : ctlL ? 'procedural' : 'rigid',
+          bones: () => ({
+            head: !!head, neck: !!neck, chest: !!chest, hips: !!hips,
+            armUL: !!armUL, armLL: !!armLL, handL: !!handL,
+            armUR: !!armUR, armLR: !!armLR, handR: !!handR,
+            ctlL: !!ctlL, sway: sway.length,
+          }),
         };
         setReady(true);
       },
@@ -585,15 +653,44 @@ export default function Avatar3D({
 
       const breathe = Math.sin(t * 1.6);
 
+      // ————— Embedded animation playback (Wanwan) —————
+      // The mixer owns the skeleton. The idle clip loops; the action clip
+      // replays periodically, and immediately when speech starts / while
+      // speaking (word emphasis), cross-fading both ways.
+      if (mixer) mixer.update(dt);
+      if (mixer && idleAction && actAction) {
+        const actDur = actAction.getClip().duration;
+        if (actUntil < 0) {
+          const speechStart = speakingRef.current && !prevSpeak;
+          if (speechStart || t >= actNext || (speakingRef.current && boundaryRef.current > 0.9 && t >= actNext - 2)) {
+            actAction.reset().fadeIn(0.25).play();
+            idleAction.fadeOut(0.25);
+            actUntil = t + actDur;
+          }
+        } else if (t >= actUntil) {
+          idleAction.reset().fadeIn(0.25).play();
+          actAction.fadeOut(0.25);
+          actUntil = -1;
+          actNext = t + 1 + Math.random() * (speakingRef.current ? 3 : 16);
+        }
+      }
+      prevSpeak = speakingRef.current;
+
       // ————— Idle showpieces: she never stands frozen —————
-      // Turn around herself: first spin 5-9s after load, then every 11-20s.
-      // 60% of turns are a smooth full 360°, 40% a half turn out and back.
-      // While listening she holds still and faces the user instead.
-      if (turnStart < 0 && t >= turnNext && listen < 0.5) {
+      // Turn around herself: first spin 5-9s after load, then per the
+      // character's motion profile. fullChance decides full 360° vs half
+      // turn out and back. While listening she holds still and faces the user.
+      if (
+        turnStart < 0 &&
+        t >= turnNext &&
+        listen < 0.5 &&
+        !mixer &&
+        motion.spinEvery[1] > 0
+      ) {
         turnStart = t;
-        turnDur = 2.6 + Math.random() * 1.2;
+        turnDur = motion.turnDur[0] + Math.random() * (motion.turnDur[1] - motion.turnDur[0]);
         turnDir = Math.random() < 0.5 ? -1 : 1;
-        turnFull = Math.random() < 0.6;
+        turnFull = Math.random() < motion.fullChance;
       }
       let yaw = 0;
       let turnLean = 0;
@@ -602,7 +699,7 @@ export default function Avatar3D({
         const u = (t - turnStart) / turnDur;
         if (u >= 1) {
           turnStart = -1;
-          turnNext = t + 11 + Math.random() * 9;
+          turnNext = t + motion.spinEvery[0] + Math.random() * Math.max(0.1, motion.spinEvery[1] - motion.spinEvery[0]);
         } else if (turnFull) {
           const s = u * u * (3 - 2 * u);
           yaw = Math.PI * 2 * turnDir * s;
@@ -621,9 +718,9 @@ export default function Avatar3D({
         }
       }
 
-      // Step forward / backward every 7-14s (skipped mid-turn), plus a slow
-      // standing drift, a side-to-side weight shift and a breathing bob.
-      if (stepStart < 0 && t >= stepNext && turnStart < 0) {
+      // Step forward / backward on the character's cadence (skipped mid-turn),
+      // plus a slow standing drift, a side-to-side weight shift and a bob.
+      if (stepStart < 0 && t >= stepNext && turnStart < 0 && motion.stepEvery[1] > 0) {
         stepStart = t;
         stepDur = 2.2 + Math.random() * 1.6;
         stepDir = Math.random() < 0.5 ? -1 : 1;
@@ -634,7 +731,7 @@ export default function Avatar3D({
         const u = (t - stepStart) / stepDur;
         if (u >= 1) {
           stepStart = -1;
-          stepNext = t + 7 + Math.random() * 7;
+          stepNext = t + motion.stepEvery[0] + Math.random() * Math.max(0.1, motion.stepEvery[1] - motion.stepEvery[0]);
         } else {
           zPulse = stepAmp * stepDir * Math.sin(u * Math.PI);
         }
@@ -642,7 +739,7 @@ export default function Avatar3D({
       const zDrift =
         modelH * (0.012 * Math.sin(t * 0.21) + 0.009 * Math.sin(t * 0.13 + 1.7));
       const xShift = modelH * 0.011 * Math.sin(t * 0.29);
-      const yBob = modelH * 0.006 * Math.sin(t * 1.6);
+      const yBob = modelH * 0.006 * motion.bob * Math.sin(t * 1.6);
       if (model) {
         model.rotation.y = yaw;
         model.position.set(
@@ -653,12 +750,22 @@ export default function Avatar3D({
             zPulse +
             speak * modelH * 0.014 * (0.6 + 0.4 * Math.sin(t * 0.7)),
         );
+        // Scale pulse — a "breathing" illusion for unrigged figures (Layla,
+        // Just-a-Girl, Casual). Procedurally-rigged models breathe via bones.
+        if (motion.pulse > 0) {
+          const sc =
+            1 +
+            motion.pulse *
+              Math.sin(t * 1.9) *
+              (0.6 + 0.4 * speak + 0.3 * beat);
+          model.scale.setScalar(baseScale * sc);
+        }
       }
 
       // ————— Speaking hand gestures —————
       let gL: number[] = NONE4;
       let gR: number[] = NONE4;
-      if (speak > 0.02) {
+      if (!mixer && speak > 0.02) {
         if (t >= gStart + GESTURES[gIdx].dur) {
           gIdx =
             (gIdx + 1 + Math.floor(Math.random() * (GESTURES.length - 1))) %
@@ -671,28 +778,11 @@ export default function Avatar3D({
         const release = Math.min(1, (gStart + G.dur - t) / 0.35);
         const env = Math.max(0, Math.min(attack, release));
         const out = G.run(p, beat, env);
-        gL = out.L.map((v) => v * speak);
-        gR = out.R.map((v) => v * speak);
+        gL = out.L.map((v) => v * speak * motion.gesture);
+        gR = out.R.map((v) => v * speak * motion.gesture);
       }
       gestureArm(ctlL, gL);
       gestureArm(ctlR, gR);
-
-      // Ten distinct touch choreographies layered over the procedural rig.
-      const tap = tapAnimationRef.current;
-      if (tap && model) {
-        const age = performance.now() / 1000 - tap.startedAt;
-        const p = Math.min(1, Math.max(0, age / (tap.animation.durationMs / 1000)));
-        if (p < 1) {
-          const pulse = Math.sin(p * Math.PI);
-          const profile = tap.animation.threeD;
-          model.rotation.y = yaw + profile.yaw * pulse;
-          model.position.y += profile.bob * modelH * pulse;
-          pose(head, profile.headTilt * pulse, 0, 0);
-          const accent = profile.armLift * pulse;
-          gestureArm(ctlL, [accent, profile.wave * pulse, 0, profile.wave * 0.4 * pulse]);
-          gestureArm(ctlR, [accent, -profile.wave * pulse, 0, -profile.wave * 0.4 * pulse]);
-        } else tapAnimationRef.current = null;
-      }
 
       // Emotion gesture: nod for happy/surprised, shake for angry/sad.
       let nod = 0;
@@ -714,46 +804,70 @@ export default function Avatar3D({
         }
       }
 
-      pose(chest, breathe * 0.012 + beat * 0.012, turnLean * 0.6, turnLean);
-      pose(upperChest, breathe * 0.016, Math.sin(t * 0.5) * 0.01, 0);
-      pose(
-        hips,
-        breathe * 0.008 + beat * 0.008,
-        0.02 * Math.sin(t * 0.5) * (0.4 + 0.6 * speak) + turnLean * 1.5,
-        0,
-      );
-      pose(
-        neck,
-        Math.sin(t * 0.9) * 0.01 + talk * 0.045 + listen * -0.03 + think * 0.04,
-        Math.sin(t * 0.45) * 0.03,
-        listen * -0.07,
-      );
-      pose(
-        head,
-        Math.sin(t * 0.8 + 1) * 0.015 +
-          talk * 0.065 +
-          nod +
-          think * 0.06 +
-          listen * -0.02 -
-          0.01,
-        Math.sin(t * 0.4) * 0.05 + Math.sin(t * 2.3) * 0.02 * speak + shake,
-        listen * -0.04,
-      );
+      // Procedural bone layer — stands down when the mixer owns the skeleton
+      // (embedded clips), since both would fight over the same bones.
+      if (!mixer) {
+        pose(chest, (breathe * 0.012 + beat * 0.012) * motion.talk, turnLean * 0.6, turnLean);
+        pose(upperChest, breathe * 0.016 * motion.talk, Math.sin(t * 0.5) * 0.01, 0);
+        pose(
+          hips,
+          breathe * 0.008 + beat * 0.008,
+          0.02 * Math.sin(t * 0.5) * (0.4 + 0.6 * speak) + turnLean * 1.5,
+          0,
+        );
+        pose(
+          neck,
+          Math.sin(t * 0.9) * 0.01 + talk * 0.045 * motion.talk + listen * -0.03 + think * 0.04,
+          Math.sin(t * 0.45) * 0.03,
+          listen * -0.07,
+        );
+        pose(
+          head,
+          Math.sin(t * 0.8 + 1) * 0.015 +
+            talk * 0.065 * motion.talk +
+            nod +
+            think * 0.06 +
+            listen * -0.02 -
+            0.01,
+          Math.sin(t * 0.4) * 0.05 + Math.sin(t * 2.3) * 0.02 * speak + shake,
+          listen * -0.04,
+        );
 
-      // Eyes: slow drift with an occasional glance; steadier while listening,
-      // lifted while thinking.
-      const glance = Math.sin(t * 0.37) > 0.92 ? 0.08 : 0;
-      const drift = (1 - listen) * Math.sin(t * 0.7) * 0.03 + glance;
-      const lift = think * 0.07;
-      pose(eyeL, lift, drift, 0);
-      pose(eyeR, lift, drift, 0);
+        // Eyes: slow drift with an occasional glance; steadier while listening,
+        // lifted while thinking.
+        const glance = Math.sin(t * 0.37) > 0.92 ? 0.08 : 0;
+        const drift = (1 - listen) * Math.sin(t * 0.7) * 0.03 + glance;
+        const lift = think * 0.07;
+        pose(eyeL, lift, drift, 0);
+        pose(eyeR, lift, drift, 0);
 
-      // Hair + skirt springs: always alive, livelier while speaking and
-      // flaring outward while she spins.
-      const amp = Math.min(0.09, 0.025 * (1 + 0.9 * talk) * (1 + excite * 1.2));
-      for (const s of sway) {
-        const a = Math.sin(t * 1.3 + s.phase) * amp;
-        pose(s, a * 0.6, 0, a);
+        // Hair + skirt springs: always alive, livelier while speaking and
+        // flaring outward while she spins.
+        const amp =
+          Math.min(0.09, 0.025 * (1 + 0.9 * talk) * (1 + excite * 1.2)) *
+          motion.sway;
+        for (const s of sway) {
+          const a = Math.sin(t * 1.3 + s.phase) * amp;
+          pose(s, a * 0.6, 0, a);
+        }
+      }
+
+      // Ten distinct touch choreographies — applied LAST so they layer over
+      // (and briefly override) the procedural rig and any embedded clips.
+      const tap = tapAnimationRef.current;
+      if (tap && model) {
+        const age = performance.now() / 1000 - tap.startedAt;
+        const p = Math.min(1, Math.max(0, age / (tap.animation.durationMs / 1000)));
+        if (p < 1) {
+          const pulse = Math.sin(p * Math.PI);
+          const profile = tap.animation.threeD;
+          model.rotation.y = yaw + profile.yaw * pulse;
+          model.position.y = model.position.y + profile.bob * modelH * pulse;
+          pose(head, profile.headTilt * pulse, 0, 0);
+          const accent = profile.armLift * pulse;
+          gestureArm(ctlL, [accent, profile.wave * pulse, 0, profile.wave * 0.4 * pulse]);
+          gestureArm(ctlR, [accent, -profile.wave * pulse, 0, -profile.wave * 0.4 * pulse]);
+        } else tapAnimationRef.current = null;
       }
 
       renderer.render(scene, camera);
@@ -773,6 +887,10 @@ export default function Avatar3D({
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('alisha:tts-boundary', onBoundary);
       ro.disconnect();
+      if (mixer) {
+        mixer.stopAllAction();
+        mixer.uncacheRoot(mixer.getRoot());
+      }
       scene.traverse((o) => {
         const m = o as THREE.Mesh;
         if (!m.isMesh) return;
@@ -789,7 +907,7 @@ export default function Avatar3D({
         host.removeChild(renderer.domElement);
       }
     };
-  }, [modelUrl]);
+  }, [modelUrl, motion]);
 
   const handleTap = () => {
     if (!ready && !failed) return;
