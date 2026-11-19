@@ -290,3 +290,39 @@ Validation (headless Chrome on the live site):
 - Old-user migration still works: injected localStorage v13/'kei' → home shows
   v14/'alisha3d' with the 3D avatar live, no page errors.
 - `bun x tsc --noEmit` clean, eslint clean on changed files, `bun run build` ok (/credits static).
+
+---
+
+## 2026-11-19 — Six new 3D avatars with per-character motion styles (commit e1c8065 + 5a81886)
+
+Inspection of the 6 uploaded models drove three motion engines in Avatar3D:
+
+| avatar | file | rig | engine | style |
+|---|---|---|---|---|
+| Zaria 3D | zaria.glb (1.9MB) | 127 VRM bones | procedural | graceful: slow spins, 39 sway springs |
+| Akeno 3D | akeno.glb (3.5MB) | 55 Mixamo bones | procedural | mystic: slow turns, gentle talk |
+| Wanwan 3D | wanwan.glb (1.2MB) | 123 Bip001 bones | embedded (city_idle/city_action via AnimationMixer) | clip replays on speech start |
+| Layla 3D | layla.glb (0.3MB) | none | rigid | sniper: fast half turns + dashes + scale pulse |
+| Girl 3D | girl.glb (1.7MB) | none | rigid | cheerful: bounces, frequent spins, pulse |
+| Casual 3D | casual.glb (6.1MB) | none | rigid | playful: weight shifts, medium cadence |
+
+Pipeline notes:
+- Akeno: unitypackage → tar → FBX2glTF (npm prebuilt) → glb; textures were NOT
+  embedded by FBX2glTF (materials Head/Dress1/Dress2/Hairs) → re-assigned the
+  package's PNGs via a @gltf-transform/core script, then webp-compressed.
+- GLTFLoader sanitizes node names ("UpperArm.L" → "UpperArmL"): bone regexes
+  use \.? to match both forms. (Diagnosed via window.__alisha3d.bones().)
+- toToon now preserves GLTF alphaMode (MASK→alphaTest, BLEND→transparent) —
+  needed for Zaria's MASK body and BLEND eyelashes.
+- Bust framing auto-widens (needW = max(h*0.3, size.x*1.05)) so unrigged
+  T-pose arms are not cropped; Galaxia framing unchanged (verified).
+- types.ts AvatarId now derives from avatars.ts registry; page.tsx passes
+  modelUrl+motion; keyboard shortcuts 1..9.
+- Rebased onto parallel-session commits (d2802d3 tap animations, be3649e
+  fallback fixes): tap phrases added for all six new avatars (ar/en/ja) and
+  the tap choreography now applies at the end of the tick (layers over the
+  motion engines).
+- LICENSES: Layla/Wanwan = Moonton IP, Akeno = DxD fan model — personal use
+  only, documented in public/models/README.md. Sketchfab models are CC BY.
+- Verified locally: modes procedural/embedded/rigid per avatar; framing
+  regression check for alisha3d passed.
