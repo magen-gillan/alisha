@@ -326,3 +326,25 @@ Pipeline notes:
   only, documented in public/models/README.md. Sketchfab models are CC BY.
 - Verified locally: modes procedural/embedded/rigid per avatar; framing
   regression check for alisha3d passed.
+
+## 2026-11-19 — blank picker thumbnails fixed (cache + stale SW)
+
+- User report: "the new avatars did not appear" on the site. Root causes found:
+  1) The six thumbnails committed earlier were captured before the viewer
+     finished rendering — the PNGs themselves were 93-98% white pixels, so
+     every new card rendered as a blank white rectangle.
+  2) The service worker's stale-while-revalidate kept serving the cached
+     blank PNGs even after the files were fixed (first load after any
+     thumbnail update always shows the previous copy).
+- Fixed the source images by loading each GLB in scripts/thumbs-viewer.html
+  (local three.js viewer, waits for model load, auto-frames, key/fill/rim
+  lighting, 480x600 canvas → toDataURL). Per-model camera params:
+  yaw=2.69 for -Z-facing rigs (zaria), yaw=0.45 for +Z-facing (akeno,
+  wanwan, layla, girl, casual); wanwan frames Object_11 (the character)
+  because the GLB ships a city diorama with ~8.5 units depth around her.
+- Cache-busting: thumbnailUrl now ends with ?v=2 (new URL → SW cache miss →
+  fresh fetch on first load after deploy) and CACHE_VERSION bumped to
+  alisha-v3 (drops the old precached shell).
+- Deployed via file-upload (git auto-deploy did not fire again):
+  dpl_B1PbHmYJo4YnFNb2kCd7njfiEnRN. Verified: live thumbs 0% white,
+  picker shows real renders, no console errors.

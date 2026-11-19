@@ -160,7 +160,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     kind: '3d',
     description: 'أنثوي رشيق — حركات بطيئة أنيقة وتأرجح شعر قوي',
     emoji: '🌸',
-    thumbnailUrl: '/models/thumbs/zaria.png',
+    thumbnailUrl: '/models/thumbs/zaria.png?v=2',
     motion: {
       ...BASE_3D_MOTION,
       spinEvery: [14, 24], turnDur: [3.0, 4.2], fullChance: 0.55,
@@ -177,7 +177,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     kind: '3d',
     description: 'غامضة — لفّات بطيئة وتميلات رأس هادئة',
     emoji: '⚡',
-    thumbnailUrl: '/models/thumbs/akeno.png',
+    thumbnailUrl: '/models/thumbs/akeno.png?v=2',
     motion: {
       ...BASE_3D_MOTION,
       spinEvery: [16, 26], turnDur: [3.2, 4.4], fullChance: 0.5,
@@ -194,7 +194,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     kind: '3d',
     description: 'أنيميشنات حقيقية مدمجة — حركة مستمرة + حركة قتال عند الكلام',
     emoji: '🐯',
-    thumbnailUrl: '/models/thumbs/wanwan.png',
+    thumbnailUrl: '/models/thumbs/wanwan.png?v=2',
     motion: {
       ...BASE_3D_MOTION,
       spinEvery: [0, 0], stepEvery: [12, 20],
@@ -212,7 +212,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     kind: '3d',
     description: 'قنّاصة نشطة — دورات سريعة واندفاع أمام/خلف',
     emoji: '🔫',
-    thumbnailUrl: '/models/thumbs/layla.png',
+    thumbnailUrl: '/models/thumbs/layla.png?v=2',
     motion: {
       ...BASE_3D_MOTION,
       spinEvery: [8, 14], turnDur: [1.8, 2.8], fullChance: 0.3,
@@ -228,7 +228,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     kind: '3d',
     description: 'مرحة مرتقزة — نطّات خفيفة ودورات متكررة',
     emoji: '🎀',
-    thumbnailUrl: '/models/thumbs/girl.png',
+    thumbnailUrl: '/models/thumbs/girl.png?v=2',
     motion: {
       ...BASE_3D_MOTION,
       spinEvery: [10, 16], turnDur: [2.2, 3.2], fullChance: 0.65,
@@ -244,7 +244,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     kind: '3d',
     description: 'عفوية مرحة — تحول وزن وميلات ودورات هادئة',
     emoji: '🧢',
-    thumbnailUrl: '/models/thumbs/casual.png',
+    thumbnailUrl: '/models/thumbs/casual.png?v=2',
     motion: {
       ...BASE_3D_MOTION,
       spinEvery: [12, 20], turnDur: [2.6, 3.6], fullChance: 0.5,
