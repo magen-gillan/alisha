@@ -37,9 +37,11 @@ import type { Emotion } from '@/lib/alisha/emotion';
 import { speak } from '@/lib/alisha/speech';
 import { getAvatarTapAnimation, getTapPhrase, type AvatarTapAnimation } from '@/animations/avatars';
 import type { ResponseLanguage } from '@/lib/alisha/types';
-import type { Avatar3DMotion } from '@/lib/alisha/avatars';
+import type { Avatar3DMotion, AvatarId } from '@/lib/alisha/avatars';
 
 interface Avatar3DProps {
+  /** Registry id used to select this character's touch choreography and phrases. */
+  avatarId: AvatarId;
   responseLanguage: ResponseLanguage;
   voiceLanguage: string;
   voiceURI: string;
@@ -338,6 +340,7 @@ function toToon(src: THREE.Material, ramp: THREE.Texture): THREE.Material {
 }
 
 export default function Avatar3D({
+  avatarId,
   speaking,
   listening,
   thinking,
@@ -921,7 +924,7 @@ export default function Avatar3D({
       setFallbackPulse(true);
       window.setTimeout(() => setFallbackPulse(false), 420);
     }
-    const animation = getAvatarTapAnimation('alisha3d', tapIndexRef.current++);
+    const animation = getAvatarTapAnimation(avatarId, tapIndexRef.current++);
     tapAnimationRef.current = { startedAt: performance.now() / 1000, animation };
     const emotion = animation.emotion;
     const setEmotion = (e: Emotion) => { emotionRef.current = e; emotionStartRef.current = -1; };

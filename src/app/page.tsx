@@ -216,6 +216,7 @@ export default function Home() {
                  the avatar's GLB from /models/ with auto material repair. */
               <Suspense fallback={<AvatarFallback />}>
                 <Avatar3D
+                  avatarId={avatarId}
                   responseLanguage={responseLanguage}
                   voiceLanguage={voiceLanguage}
                   voiceURI={voiceURI}
