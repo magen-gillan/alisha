@@ -512,6 +512,12 @@ export default function Avatar3D({
       basePos.copy(obj.position);
       camera.position.set(0, targetY, dist);
       camera.lookAt(0, targetY, 0);
+      // Models ship at wildly different scales (Layla is centimetre-scale,
+      // height ≈ 200 units → camera distance ≈ 400). Fit the clip planes to
+      // the computed distance or huge models get entirely far-plane-clipped.
+      camera.near = Math.max(0.01, dist * 0.01);
+      camera.far = dist * 4 + modelH * 2;
+      camera.updateProjectionMatrix();
     };
 
     const resize = () => {
