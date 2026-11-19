@@ -332,6 +332,7 @@ export default function Avatar3D({
   const tapAnimationRef = useRef<{ startedAt: number; animation: AvatarTapAnimation } | null>(null);
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
+  const [fallbackPulse, setFallbackPulse] = useState(false);
 
   useEffect(() => {
     speakingRef.current = speaking;
@@ -791,7 +792,11 @@ export default function Avatar3D({
   }, [modelUrl]);
 
   const handleTap = () => {
-    if (!ready) return;
+    if (!ready && !failed) return;
+    if (failed) {
+      setFallbackPulse(true);
+      window.setTimeout(() => setFallbackPulse(false), 420);
+    }
     const animation = getAvatarTapAnimation('alisha3d', tapIndexRef.current++);
     tapAnimationRef.current = { startedAt: performance.now() / 1000, animation };
     const emotion = animation.emotion;
@@ -801,7 +806,18 @@ export default function Avatar3D({
   };
 
   if (failed) {
-    return <img src={fallbackImage} alt="Alisha" className="h-full w-full object-contain" />;
+    return (
+      <div
+        onClick={handleTap}
+        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleTap(); } }}
+        role="button"
+        tabIndex={0}
+        aria-label="Alisha avatar"
+        className={`h-full w-full cursor-pointer transition-transform duration-300 ${fallbackPulse ? 'scale-[1.025] brightness-125' : ''}`}
+      >
+        <img src={fallbackImage} alt="Alisha" className="h-full w-full object-contain" />
+      </div>
+    );
   }
 
   return (

@@ -14,6 +14,8 @@ import type { ChatMessage } from '@/store/alisha-store';
 
 const DEFAULT_TOKEN_BUDGET = 6000;
 const CHARS_PER_TOKEN = 3;
+// The API accepts at most 30 messages. Reserve room for system + current user.
+const MAX_HISTORY_MESSAGES = 28;
 
 /** Estimate the token count of a single message. */
 export function estimateTokens(text: string): number {
@@ -57,5 +59,8 @@ export function buildHistory(
   budget: number = DEFAULT_TOKEN_BUDGET,
 ): { role: 'user' | 'model'; text: string }[] {
   const trimmed = trimConversationToTokens(messages as ChatMessage[], budget);
-  return trimmed.map((m) => ({ role: m.role, text: m.text }));
+  const valid = trimmed.filter((m) =>
+    (m.role === 'user' || m.role === 'model') && typeof m.text === 'string' && m.text.trim(),
+  );
+  return valid.slice(-MAX_HISTORY_MESSAGES).map((m) => ({ role: m.role, text: m.text }));
 }

@@ -523,7 +523,13 @@ function AvatarInstance({
   }, [offsetX, offsetY]);
   // ---- State-based motion triggers ----
   useEffect(() => {
-    if (loadState !== 'ready' || !modelRef.current) return;
+    if (loadState !== 'ready' && loadState !== 'failed') return;
+    if (!modelRef.current) {
+      const animation = getAvatarTapAnimation(avatarId, tapIndexRef.current++);
+      setEmotion(animation.emotion);
+      speak({ text: getTapPhrase(animation, responseLanguage), language: responseLanguage, voiceLanguage, voiceURI, rate: speechRate, pitch: speechPitch });
+      return;
+    }
     const model = modelRef.current as any;
     if (!model._alishaPlayMotion) return;
 
@@ -550,7 +556,13 @@ function AvatarInstance({
    * Tap handler — plays Tap motion (or expression) on click
    */
   const handleTap = () => {
-    if (loadState !== 'ready' || !modelRef.current) return;
+    if (loadState !== 'ready' && loadState !== 'failed') return;
+    if (!modelRef.current) {
+      const animation = getAvatarTapAnimation(avatarId, tapIndexRef.current++);
+      setEmotion(animation.emotion);
+      speak({ text: getTapPhrase(animation, responseLanguage), language: responseLanguage, voiceLanguage, voiceURI, rate: speechRate, pitch: speechPitch });
+      return;
+    }
     const model = modelRef.current as any;
     const animation = getAvatarTapAnimation(avatarId, tapIndexRef.current++);
     tapAnimationRef.current = { startedAt: performance.now(), animation };
