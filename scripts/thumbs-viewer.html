@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; background: #1a1228; overflow: hidden; }
+  canvas { display: block; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "/node_modules/three/build/three.module.js",
+    "three/addons/": "/node_modules/three/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+const params = new URLSearchParams(location.search);
+const modelUrl = params.get('model') || '/models/zaria.glb';
+const yaw = parseFloat(params.get('yaw') ?? '2.69');   // 3/4 front view (models face -Z)
+const pitch = parseFloat(params.get('pitch') ?? '0.15');
+const zoom = parseFloat(params.get('zoom') ?? '1.06');
+const frameNode = params.get('frameNode') || '';       // frame this named node instead of the whole scene
+const dump = params.get('dump') === '1';
+
+const W = 480, H = 600;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(1);
+renderer.setClearColor(0x1a1228, 1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1228);
+
+const camera = new THREE.PerspectiveCamera(32, W / H, 0.01, 1000);
+
+// Soft studio lighting: key + fill + rim + hemisphere ambient
+scene.add(new THREE.HemisphereLight(0xbfa8ff, 0x2a1f3d, 1.1));
+const key = new THREE.DirectionalLight(0xffffff, 2.2);
+key.position.set(2.5, 4, 3.5);
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xc9b6ff, 0.9);
+fill.position.set(-3, 1.5, 2);
+scene.add(fill);
+const rim = new THREE.DirectionalLight(0x9f7dff, 1.4);
+rim.position.set(-1.5, 3, -3);
+scene.add(rim);
+
+window.__ready = false;
+window.__err = null;
+
+const loader = new GLTFLoader();
+const draco = new DRACOLoader();
+draco.setDecoderPath('/node_modules/three/examples/jsm/libs/draco/');
+loader.setDRACOLoader(draco);
+
+loader.load(modelUrl, (gltf) => {
+  const root = gltf.scene;
+  scene.add(root);
+  window.__scene = root;
+
+  if (dump) {
+    const info = [];
+    root.updateMatrixWorld(true);
+    root.traverse((o) => {
+      const b = new THREE.Box3().setFromObject(o);
+      const s = new THREE.Vector3(); b.getSize(s);
+      info.push(`${o.name||o.type} size=(${s.x.toFixed(1)},${s.y.toFixed(1)},${s.z.toFixed(1)})`);
+    });
+    window.__dump = info.slice(0, 40);
+    window.__ready = true;
+    return;
+  }
+
+  // Frame the model: fit bounding box into view
+  let target = root;
+  if (frameNode) {
+    root.traverse((o) => { if (o.name === frameNode) target = o; });
+  }
+  const box = new THREE.Box3().setFromObject(target);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const dist = (maxDim / (2 * Math.tan((camera.fov * Math.PI) / 360))) * zoom;
+
+  camera.position.set(
+    center.x + dist * Math.sin(yaw) * Math.cos(pitch),
+    center.y + dist * Math.sin(pitch),
+    center.z + dist * Math.cos(yaw) * Math.cos(pitch),
+  );
+  camera.lookAt(center.x, center.y - size.y * 0.13, center.z);
+  camera.near = dist / 100;
+  camera.far = dist * 100;
+  camera.updateProjectionMatrix();
+
+  // let materials settle, then flag ready
+  renderer.render(scene, camera);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    renderer.render(scene, camera);
+    window.__ready = true;
+  }));
+}, undefined, (err) => {
+  window.__err = String(err);
+});
+</script>
+</body>
+</html>
