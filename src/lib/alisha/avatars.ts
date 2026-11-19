@@ -95,7 +95,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Cubism 4 Sample',
     emoji: '👧',
     thumbnailUrl: '/live2d/thumbnails/kei-gallery.webp',
-    calibration: { scale: 1.31, xOffset: 0, yOffset: 0, normalizedX: -0.029, normalizedY: -0.105 },
+    calibration: { scale: 1, xOffset: 0, yOffset: 0, normalizedX: -0.029, normalizedY: -0.105 },
     moc3Version: 5,
   },
   {
@@ -105,7 +105,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Chinese-style avatar',
     emoji: '🧝',
     thumbnailUrl: '/live2d/thumbnails/jane-gallery.webp',
-    calibration: { scale: 1.97, xOffset: 0, yOffset: 0, normalizedX: 0.050, normalizedY: 0.341 },
+    calibration: { scale: 1, xOffset: 0, yOffset: 0, normalizedX: 0.050, normalizedY: 0.16 },
     moc3Version: 5,
   },
   {
@@ -115,7 +115,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Ice-themed avatar',
     emoji: '❄️',
     thumbnailUrl: '/live2d/thumbnails/icegirl.png',
-    calibration: { scale: 3.45, xOffset: 0, yOffset: 0, normalizedX: 0.014, normalizedY: 0.622 },
+    calibration: { scale: 1, xOffset: 0, yOffset: 0, normalizedX: 0.014, normalizedY: 0.16 },
     moc3Version: 4,
   },
   {
@@ -125,7 +125,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Genshin Impact style',
     emoji: '🐉',
     thumbnailUrl: '/live2d/thumbnails/ganyu-gallery.webp',
-    calibration: { scale: 1.95, xOffset: 0, yOffset: 0, normalizedX: -0.006, normalizedY: 0.251 },
+    calibration: { scale: 1, xOffset: 0, yOffset: 0, normalizedX: -0.006, normalizedY: 0.16 },
     moc3Version: 4,
   },
   {
@@ -135,7 +135,7 @@ export const AVATAR_MODELS: AvatarModel[] = [
     description: 'Pro avatar with motions',
     emoji: '✨',
     thumbnailUrl: '/live2d/thumbnails/miara-gallery.webp',
-    calibration: { scale: 1.82, xOffset: 0, yOffset: 0, normalizedX: 0.012, normalizedY: 0.105 },
+    calibration: { scale: 1, xOffset: 0, yOffset: 0, normalizedX: 0.012, normalizedY: 0.105 },
     moc3Version: 3,
   },
   {

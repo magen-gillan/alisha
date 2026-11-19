@@ -79,6 +79,16 @@ const DEFAULT_MOTION: Avatar3DMotion = {
   pulse: 0,
 };
 
+/** Frame-rate independent critically-damped interpolation for pose targets. */
+function damp(current: number, target: number, dt: number, speed: number): number {
+  return current + (target - current) * (1 - Math.exp(-speed * dt));
+}
+
+function easeInOut(value: number): number {
+  const t = Math.max(0, Math.min(1, value));
+  return t * t * (3 - 2 * t);
+}
+
 /**
  * Verified against the GLBs: VRM-style (Galaxia, Zaria) and Mixamo-style
  * (Akeno). NOTE: GLTFLoader sanitizes node names (strips '.'), so Mixamo's
@@ -492,6 +502,13 @@ export default function Avatar3D({
     let actNext = 8 + Math.random() * 8; // next idle action replay
     let prevSpeak = false;
     let baseScale = 1;
+    // These two imported rigs face away from the camera at their GLB rest
+    // rotation; the offset is applied before all procedural turns.
+    const facingOffset = avatarId === 'zaria3d' || avatarId === 'akeno3d' ? Math.PI : 0;
+    let smoothYaw = facingOffset;
+    let smoothX = 0;
+    let smoothY = 0;
+    let smoothZ = 0;
 
     const frame = (obj: THREE.Object3D) => {
       const box = new THREE.Box3().setFromObject(obj);
@@ -710,7 +727,7 @@ export default function Avatar3D({
           turnStart = -1;
           turnNext = t + motion.spinEvery[0] + Math.random() * Math.max(0.1, motion.spinEvery[1] - motion.spinEvery[0]);
         } else if (turnFull) {
-          const s = u * u * (3 - 2 * u);
+          const s = easeInOut(u);
           yaw = Math.PI * 2 * turnDir * s;
           excite = Math.min(
             1.5,
@@ -718,7 +735,7 @@ export default function Avatar3D({
           );
           turnLean = Math.sin(u * Math.PI) * 0.03 * turnDir;
         } else {
-          yaw = Math.PI * turnDir * Math.sin(u * Math.PI);
+          yaw = Math.PI * turnDir * Math.sin(easeInOut(u) * Math.PI);
           excite = Math.min(
             1.5,
             (Math.abs(Math.cos(u * Math.PI)) / turnDur) * Math.PI * 0.3,
@@ -742,7 +759,7 @@ export default function Avatar3D({
           stepStart = -1;
           stepNext = t + motion.stepEvery[0] + Math.random() * Math.max(0.1, motion.stepEvery[1] - motion.stepEvery[0]);
         } else {
-          zPulse = stepAmp * stepDir * Math.sin(u * Math.PI);
+          zPulse = stepAmp * stepDir * Math.sin(easeInOut(u) * Math.PI);
         }
       }
       const zDrift =
@@ -750,15 +767,16 @@ export default function Avatar3D({
       const xShift = modelH * 0.011 * Math.sin(t * 0.29);
       const yBob = modelH * 0.006 * motion.bob * Math.sin(t * 1.6);
       if (model) {
-        model.rotation.y = yaw;
-        model.position.set(
-          basePos.x + xShift,
-          basePos.y + yBob,
-          basePos.z +
-            zDrift +
-            zPulse +
-            speak * modelH * 0.014 * (0.6 + 0.4 * Math.sin(t * 0.7)),
-        );
+        const targetX = basePos.x + xShift;
+        const targetY = basePos.y + yBob;
+        const targetZ = basePos.z + zDrift + zPulse +
+          speak * modelH * 0.014 * (0.6 + 0.4 * Math.sin(t * 0.7));
+        smoothYaw = damp(smoothYaw, facingOffset + yaw, dt, 10);
+        smoothX = damp(smoothX, targetX, dt, 12);
+        smoothY = damp(smoothY, targetY, dt, 12);
+        smoothZ = damp(smoothZ, targetZ, dt, 12);
+        model.rotation.y = smoothYaw;
+        model.position.set(smoothX, smoothY, smoothZ);
         // Scale pulse — a "breathing" illusion for unrigged figures (Layla,
         // Just-a-Girl, Casual). Procedurally-rigged models breathe via bones.
         if (motion.pulse > 0) {
@@ -767,7 +785,8 @@ export default function Avatar3D({
             motion.pulse *
               Math.sin(t * 1.9) *
               (0.6 + 0.4 * speak + 0.3 * beat);
-          model.scale.setScalar(baseScale * sc);
+          const targetScale = baseScale * sc;
+          model.scale.setScalar(damp(model.scale.x, targetScale, dt, 14));
         }
       }
 
@@ -783,8 +802,8 @@ export default function Avatar3D({
         }
         const G = GESTURES[gIdx];
         const p = Math.min(1, Math.max(0, (t - gStart) / G.dur));
-        const attack = Math.min(1, (t - gStart) / 0.3);
-        const release = Math.min(1, (gStart + G.dur - t) / 0.35);
+        const attack = easeInOut(Math.min(1, (t - gStart) / 0.3));
+        const release = easeInOut(Math.min(1, (gStart + G.dur - t) / 0.35));
         const env = Math.max(0, Math.min(attack, release));
         const out = G.run(p, beat, env);
         gL = out.L.map((v) => v * speak * motion.gesture);
@@ -868,9 +887,9 @@ export default function Avatar3D({
         const age = performance.now() / 1000 - tap.startedAt;
         const p = Math.min(1, Math.max(0, age / (tap.animation.durationMs / 1000)));
         if (p < 1) {
-          const pulse = Math.sin(p * Math.PI);
+          const pulse = Math.sin(easeInOut(p) * Math.PI);
           const profile = tap.animation.threeD;
-          model.rotation.y = yaw + profile.yaw * pulse;
+          model.rotation.y = smoothYaw + profile.yaw * pulse;
           model.position.y = model.position.y + profile.bob * modelH * pulse;
           pose(head, profile.headTilt * pulse, 0, 0);
           const accent = profile.armLift * pulse;

@@ -292,19 +292,28 @@ function AvatarInstance({
           const cv = canvasRef.current;
           if (cv) { cv.style.width = '100%'; cv.style.height = '100%'; }
 
-          const internal = modelRef.current.internalModel;
-          const mw = internal?.originalWidth || modelRef.current.originalWidth || internal?.canvasWidth || 1024;
-          const mh = internal?.originalHeight || modelRef.current.originalHeight || internal?.canvasHeight || 1024;
+          // Use the actual model bounds.  The original canvas dimensions differ
+          // wildly between Cubism exports and were the source of severe crops
+          // on Kei and the newer models.
+          const bounds = modelRef.current.getLocalBounds?.();
+          const mw = bounds?.width || modelRef.current.width || 1024;
+          const mh = bounds?.height || modelRef.current.height || 1024;
 
           // "Contain" fit: at 1.0x the WHOLE character is visible on screen.
           // The user's zoom multiplies this value.
-          const baseScale = Math.min(cw / mw, ch / mh) * 0.9;
-          const scale = baseScale * scaleRef.current;
+          const baseScale = Math.min(cw / mw, ch / mh) * 0.82;
+          // The registry now stores conservative 1x baselines. Keep a small
+          // safety range for future per-model tuning without allowing a model
+          // to escape the visible viewport.
+          const safeCalibration = Math.max(0.72, Math.min(1.05, scaleRef.current));
+          const scale = baseScale * safeCalibration;
           try { modelRef.current.scale.set(scale); } catch {}
           // Offsets are normalized to the viewport (fraction of width/height).
           try {
-            modelRef.current.x = cw * (0.5 + offsetRef.current.x) + avatar.calibration.xOffset;
-            modelRef.current.y = ch * (0.5 + offsetRef.current.y) + avatar.calibration.yOffset;
+            const safeOffsetX = Math.max(-0.16, Math.min(0.16, offsetRef.current.x));
+            const safeOffsetY = Math.max(-0.16, Math.min(0.16, offsetRef.current.y));
+            modelRef.current.x = cw * (0.5 + safeOffsetX) + avatar.calibration.xOffset;
+            modelRef.current.y = ch * (0.5 + safeOffsetY) + avatar.calibration.yOffset;
           } catch {}
         };
 
@@ -328,6 +337,11 @@ function AvatarInstance({
         let mouthValue = 0;
         let mouthTarget = 0;
         let nextMouthChange = 0;
+        let previousNow = performance.now();
+        let smoothAngleX = 0;
+        let smoothAngleY = 0;
+        let smoothEyeX = 0;
+        let smoothEyeY = 0;
         // Breathing animation
         let breathPhase = 0;
         // Parallax offset for cinematic depth
@@ -337,6 +351,9 @@ function AvatarInstance({
         const tick = (now = performance.now()) => {
           if (modelRef.current) {
             try {
+              const dt = Math.min(0.05, Math.max(0.001, (now - previousNow) / 1000));
+              previousNow = now;
+              const followEase = 1 - Math.exp(-dt * 9);
               const internal = modelRef.current.internalModel;
               const core = internal?.coreModel;
               const setParameter = (id: string, value: number) => {
@@ -352,22 +369,27 @@ function AvatarInstance({
               const cursor = cursorRef.current;
               const targetParallaxX = cursor.x * 12;
               const targetParallaxY = cursor.y * 6;
-              parallaxX += (targetParallaxX - parallaxX) * 0.05;
-              parallaxY += (targetParallaxY - parallaxY) * 0.05;
+              parallaxX += (targetParallaxX - parallaxX) * followEase;
+              parallaxY += (targetParallaxY - parallaxY) * followEase;
+
+              smoothAngleX += (cursor.x * 30 - smoothAngleX) * followEase;
+              smoothAngleY += (-cursor.y * 20 - smoothAngleY) * followEase;
+              smoothEyeX += (cursor.x - smoothEyeX) * followEase;
+              smoothEyeY += (cursor.y - smoothEyeY) * followEase;
 
               // Head follows cursor (larger range than before for cinematic feel)
-              setParameter('ParamAngleX', cursor.x * 30);
-              setParameter('ParamAngleY', -cursor.y * 20);
-              setParameter('ParamEyeBallX', cursor.x);
-              setParameter('ParamEyeBallY', cursor.y);
+              setParameter('ParamAngleX', smoothAngleX);
+              setParameter('ParamAngleY', smoothAngleY);
+              setParameter('ParamEyeBallX', smoothEyeX);
+              setParameter('ParamEyeBallY', smoothEyeY);
 
               // Body follows head with delay (parallax effect)
-              setParameter('ParamBodyAngleX', cursor.x * 10);
-              setParameter('ParamBodyAngleY', -cursor.y * 6);
+              setParameter('ParamBodyAngleX', smoothAngleX / 3);
+              setParameter('ParamBodyAngleY', smoothAngleY * 0.3);
 
               // ---- Breathing (Idle) ----
               // Continuous subtle breathing — always active
-              breathPhase += 0.015;
+              breathPhase += dt * 1.15;
               const breathValue = Math.sin(breathPhase) * 0.5 + 0.5; // 0..1
               try { setParameter('ParamBreath', breathValue); } catch {}
 
@@ -408,7 +430,8 @@ function AvatarInstance({
                 mouthTarget = 0;
                 nextMouthChange = now + 260;
               }
-              mouthValue += (mouthTarget - mouthValue) * (speakingRef.current ? 0.16 : 0.24);
+              const mouthEase = 1 - Math.exp(-dt * (speakingRef.current ? 12 : 16));
+              mouthValue += (mouthTarget - mouthValue) * mouthEase;
               setParameter('ParamMouthOpenY', Math.max(0, Math.min(1, mouthValue)));
 
               // ---- Blinking (suspended during speech) ----
@@ -430,9 +453,9 @@ function AvatarInstance({
                 if (progress < 1) {
                   const pulse = Math.sin(progress * Math.PI);
                   const profile = tap.animation.live2d;
-                  setParameter('ParamAngleX', cursor.x * 30 + profile.angleX * pulse);
-                  setParameter('ParamAngleY', -cursor.y * 20 + profile.angleY * pulse);
-                  setParameter('ParamBodyAngleX', cursor.x * 10 + profile.bodyAngleX * pulse);
+                  setParameter('ParamAngleX', smoothAngleX + profile.angleX * pulse);
+                  setParameter('ParamAngleY', smoothAngleY + profile.angleY * pulse);
+                  setParameter('ParamBodyAngleX', smoothAngleX / 3 + profile.bodyAngleX * pulse);
                   setParameter('ParamMouthForm', profile.mouthForm * pulse);
                   setParameter('ParamEyeLOpen', Math.max(0.05, Math.min(1.2, eyeL * (profile.eyeScale + (1 - profile.eyeScale) * (1 - pulse)))));
                   setParameter('ParamEyeROpen', Math.max(0.05, Math.min(1.2, eyeR * (profile.eyeScale + (1 - profile.eyeScale) * (1 - pulse)))));
