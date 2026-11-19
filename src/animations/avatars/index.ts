@@ -68,6 +68,36 @@ const VOICES: Record<AvatarId, { ar: string[]; en: string[]; ja: string[] }> = {
     en: ['Was that you? I felt the touch.', 'Here is my special wink.', 'Wow, you surprised me!', 'Yes, I agree with you.', 'Where are your eyes going?', 'I am feeling a little shy.', 'Would you like to ask me something?', 'A heart sign just for you.', 'Do not worry, I am beside you.', 'I will wave until you return.'],
     ja: ['今のはあなた？タッチを感じたよ。', '特別なウインクを送るね。', 'わあ、驚かせたね！', 'うん、あなたに賛成。', '視線はどこへ行くの？', '少し恥ずかしい気分だよ。', '何か私に聞きたい？', 'あなたにハートのサイン。', '心配しないで、そばにいるよ。', '戻るまで手を振っているね。'],
   },
+  zaria3d: {
+    ar: ['لمستك رقيقة كالزهرة.', 'غمزة خفيفة بيننا.', 'يا للروعة، فاجأتني!', 'أوافقك من كل قلبي.', 'عيوني تنساب نحو الأفق.', 'شعري يخجل من الريح.', 'اسألني بما يميل قلبك.', 'زهرة صغيرة أهديك إياها.', 'أنا هنا، بهدوء وأمان.', 'أودعك ببصمة وردة.'],
+    en: ['Your touch is soft as a flower.', 'A light wink between us.', 'How lovely, you surprised me!', 'I agree with all my heart.', 'My gaze drifts to the horizon.', 'Even my hair is shy in the wind.', 'Ask me what your heart leans toward.', 'A little flower, just for you.', 'I am here, calm and safe.', 'I leave you a rose petal as farewell.'],
+    ja: ['あなたのタッチは花みたいに優しいね。', '私たちだけの軽いウインク。', 'なんて素敵、驚かせたね！', '心から賛成するよ。', '視線は地平線へ漂うの。', '風に髪も少し照れてるね。', '心が向くままに聞いて。', 'あなたに小花を贈るよ。', '静かに、ここにいるから。', 'バラの花びらを置いていくね。'],
+  },
+  akeno3d: {
+    ar: ['آه، لمستك وصلت بسرعة.', 'غمزتي؟ أحسنت الملاحظة.', 'يا لك من مثير للاهتمام.', 'رأيك… مناسب جدًا.', 'أراقبك من زاوية عيني.', 'هذا محرج… بشكل لطيف.', 'سؤالك؟ أنا مستعدة.', 'برق صغير أهديك إياه.', 'لا تخف، أنا أراقبك.', 'سأنتظرك بابتسامة غامضة.'],
+    en: ['My, your touch arrived quickly.', 'My wink? Well noticed.', 'How very interesting of you.', 'Your opinion… suits me fine.', 'I am watching from the corner of my eye.', 'That is embarrassing… in a nice way.', 'Your question? I am ready.', 'A little lightning, just for you.', 'Do not fear, I am watching over you.', 'I will wait with a mysterious smile.'],
+    ja: ['あら、タッチが早く届いたわね。', '私のウインク？よく気づいたわ。', 'あなたって面白いわね。', 'あなたの意見…とても気に入ったわ。', '視線の端で見てるのよ。', 'ちょっと恥ずかしいわ…いい意味で。', '質問は？準備できてるわよ。', 'あなたに小さな雷を。', '怖がらないで、見守ってるから。', '謎めいた笑みで待ってるわ。'],
+  },
+  wanwan3d: {
+    ar: ['مرحبًا! لمستك سريعة كالريح!', 'رأيت غمزتي، أليس كذلك؟', 'واو! ما الذي حدث؟', 'بالطبع، نعم!', 'عيوني تطارد كل حركة.', 'أوه… هذا محرج!', 'اسألني، أنا جاهزة للقتال!', 'قلب نمر صغير لك!', 'لا تقلق، أنا حذرة دائمًا.', 'سأقفز حتى تعود!'],
+    en: ['Hey! Your touch is quick as wind!', 'You saw my wink, did you not?', 'Whoa! What happened?', 'Of course, yes!', 'My eyes chase every move.', 'Oh… that is embarrassing!', 'Ask me, I am ready for action!', 'A little tiger heart for you!', 'Do not worry, I am always careful.', 'I will bounce around until you return!'],
+    ja: ['やあ！タッチが風みたいに速い！', '私のウインク、見たよね？', 'うわっ！何が起きたの？', 'もちろん、イエス！', '目は全部の動きを追いかけるよ。', 'うわ…ちょっと恥ずかしい！', '聞いて、もう準備万端！', 'あなたにトラのハート！', '心配しないで、いつも慎重だよ。', '戻るまで跳ね回ってるから！'],
+  },
+  layla3d: {
+    ar: ['لمستك على المدى القصير!', 'غمزة من القنّاصة!', 'هدف مذهل، فاجأتني!', 'مصيبتي معك تمامًا.', 'أراقب الأفق بمنظاري.', 'أوه… احمرّ وجهي!', 'اطلب دعمًا وسأجيب!', 'طاقة شمسية لك!', 'غطيّك، أنا هنا.', 'سأرسل الوميض الأخير، وداعًا!'],
+    en: ['Your touch, at close range!', 'A wink from the sniper!', 'Great shot, you surprised me!', 'My aim agrees with you.', 'I watch the horizon through my scope.', 'Oh… I am blushing!', 'Call for support and I will answer!', 'Some solar energy for you!', 'I will cover you, I am here.', 'Sending the last flash, see you!'],
+    ja: ['近距離からのタッチだね！', 'スナイパーのウインク！', 'すごい、驚かせたね！', '私の照準は君に賛成。', 'スコープで地平線を見てるよ。', 'うわ…顔が赤くなった！', 'サポート求めて、すぐ来るよ！', 'あなたに太陽のエネルギー！', 'カバーするから、ここにいるよ。', '最後のフラッシュを送るね、また！'],
+  },
+  girl3d: {
+    ar: ['تيم تيم! لمستك وصلت.', 'غمزة صغيرة مخبأة.', 'أوه أوه! ما هذا؟', 'أوافقك تمامًا تمامًا!', 'أبحث عن شيء جميل هناك.', 'أهه… خجلت الآن!', 'سؤال؟ أنا أحب الأسئلة!', 'فيونكة قلب لك!', 'أنا بخير، لا تقلق.', 'ألوّح ألوّح، إلى اللقاء!'],
+    en: ['Ta-da! Your touch arrived.', 'A tiny hidden wink.', 'Oh-oh! What was that?', 'I totally, totally agree!', 'I am looking for something pretty there.', 'Eep… I am shy now!', 'A question? I love questions!', 'A ribbon heart for you!', 'I am fine, do not worry.', 'Wave wave, see you soon!'],
+    ja: ['じゃーん！タッチが届いたよ。', 'ちっちゃな隠しウインク。', 'おっおっ！何これ？', 'ぜんぜんぜん赞成！', 'あそこで素敵なものを探してるの。', 'あわわ…今照れた！', '質問？質問大好き！', 'あなたにリボンのハート！', '大丈夫、心配しないで。', '手を振る振る、またね！'],
+  },
+  casual3d: {
+    ar: ['يا هلا، شعرت بلمستك.', 'غمزة عفوية مني.', 'حصري! ماذا كان ذلك؟', 'أوافقك بلا تفكير.', 'أشاهد المكان من هنا.', 'هيه… رخا قليلًا!', 'جرّبني بسؤال صعب.', 'إيماءة سلام لك.', 'كل شيء تمام، ألقى بالك.', 'أشوفك بعدين، أرتاح شوي!'],
+    en: ['Hey there, I felt your touch.', 'A casual wink from me.', 'Exclusive! What was that?', 'I agree without thinking twice.', 'I am checking the place from here.', 'Whoa… easy there!', 'Try me with a hard question.', 'A chill sign for you.', 'Everything is fine, see you around.', 'Catch you later, taking a breather!'],
+    ja: ['やあ、タッチ感じたよ。', '気ままなウインクね。', 'レア！今の何？', '迷わず賛成するよ。', 'ここから場内チェック中。', 'わっ…ちょっとまって！', '難しい質問で試して。', 'あなたにピースサイン。', '全部大丈夫、またね。', 'じゃあ後で、ちょっと休むね！'],
+  },
 };
 
 export const AVATAR_TAP_ANIMATIONS: Record<AvatarId, AvatarTapAnimation[]> = Object.fromEntries(
